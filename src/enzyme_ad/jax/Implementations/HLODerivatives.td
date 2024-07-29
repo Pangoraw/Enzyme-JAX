@@ -429,6 +429,13 @@ def GradDataConvWindowStrides : GlobalExpr</*needsprimal*/0, /*needsshadow*/0, [
 
 def GradDataConvPadding : GlobalExpr</*needsprimal*/0, /*needsshadow*/0, [{
   op.getPaddingAttr();
+  // auto padding = ;
+  // llvm::SmallVector<int64_t> values = {2,2,2,2};
+  // padding ?
+  //   DenseIntElementsAttr::get(
+  //       RankedTensorType::get({2,2}, builder.getIntegerType(64)),
+  //       values) :
+  //   padding;
 }]>;
 
 def GradDataConvLhsDialation : GlobalExpr</*needsprimal*/0, /*needsshadow*/0, [{
@@ -441,6 +448,17 @@ def GradDataConvRhsDialation : GlobalExpr</*needsprimal*/0, /*needsshadow*/0, [{
 
 def GradDataConvWindowReversal : GlobalExpr</*needsprimal*/0, /*needsshadow*/0, [{
   op.getWindowReversalAttr();
+  // auto windowReversal =  ;
+  //
+  // std::optional<DenseBoolArrayAttr> attr = std::nullopt;
+  // if (windowReversal.has_value()) {
+  //   SmallVector<bool> gradDataWindowReversal;
+  //   for (auto wr : windowReversal.value())
+  //     gradDataWindowReversal.push_back(!wr);
+  //   attr = DenseBoolArrayAttr::get(op.getContext(), gradDataWindowReversal);
+  // }
+  //
+  // OptionalAttr::get(op.getContext(), attr);
 }]>;
 
 def GradDataConvDimensionNumbers : GlobalExpr</*needsprimal*/0, /*needsshadow*/0, [{
@@ -533,6 +551,32 @@ def : HLOReadOnlyIdentityOp<"BroadcastInDimOp">;
 
 def : HLOInactiveOp<"CeilOp">;
 
+// (Clamp $min, $operand, $max) -> (Minimum (Maximum $operand, $min), $max)
+def : HLODerivative<"ClampOp", (Op $min, $operand, $max), [
+  (Select
+    (And
+        (Compare $min, $max, (LT)),
+        (Compare $min, $operand, (GT))
+    ),
+    (DiffeRet),
+    (HLOConstantFP<"0"> $min)
+  ),
+  (Select
+    (Or
+        (Compare $operand, $min, (LT)),
+        (Compare $operand, $max, (GT))
+    ),
+    (HLOConstantFP<"0"> $operand),
+    (DiffeRet)
+  ),
+  (Select
+    (Compare (Max $operand, $min), $max, (GT)),
+    (DiffeRet),
+    (HLOConstantFP<"0"> $max)
+  ),
+]>;
+
+
 def : HLODerivative<"CbrtOp", (Op $x), [
   (CheckedMul (DiffeRet), (Div (Pow $x, (Div (HLOConstantFP<"-2">), (HLOConstantFP<"3">))), (HLOConstantFP<"3">))),
 ]>;
@@ -548,8 +592,26 @@ def : HLOMemoryIdentityOp<"ConcatenateOp", [], [-1]>;
 
 def : HLODerivative<"ConvolutionOp", (Op $lhs, $rhs),
                     [
-                        (Convolution (TypeOf $lhs), (DiffeRet), $lhs, (GradFilterConvWindowStrides), (GradFilterConvPadding), (GradFilterConvLhsDialation), (GradFilterConvRhsDialation), (GradFilterConvWindowReversal), (GradFilterConvDimensionNumbers), (GradFilterConvFeatureGroupCount), (GradFilterConvBatchGroupCount), (ResultDotPrec)),
-                        (Convolution (TypeOf $rhs), (DiffeRet), $rhs, (GradDataConvWindowStrides), (GradDataConvPadding), (GradDataConvLhsDialation), (GradDataConvRhsDialation), (GradDataConvWindowReversal), (GradDataConvDimensionNumbers), (GradDataConvFeatureGroupCount), (GradDataConvBatchGroupCount), (ResultDotPrec))
+                        (Convolution (TypeOf $lhs), (DiffeRet), $rhs,
+                            (GradDataConvWindowStrides),
+                            (GradDataConvPadding),
+                            (GradDataConvLhsDialation),
+                            (GradDataConvRhsDialation),
+                            (GradDataConvWindowReversal),
+                            (GradDataConvDimensionNumbers),
+                            (GradDataConvFeatureGroupCount),
+                            (GradDataConvBatchGroupCount),
+                            (ResultDotPrec)),
+                        (Convolution (TypeOf $rhs), (DiffeRet), $lhs,
+                            (GradFilterConvWindowStrides),
+                            (GradFilterConvPadding),
+                            (GradFilterConvLhsDialation),
+                            (GradFilterConvRhsDialation),
+                            (GradFilterConvWindowReversal),
+                            (GradFilterConvDimensionNumbers),
+                            (GradFilterConvFeatureGroupCount),
+                            (GradFilterConvBatchGroupCount),
+                            (ResultDotPrec))
                     ],
                     (Add (SelectIfActive $lhs, 
                       (Convolution (ResultTypes), (Shadow $lhs), $rhs, (ConvWindowStrides), (ConvPadding), (ConvLhsDialation), (ConvRhsDialation), (ConvWindowReversal), (ConvDimensionNumbers), (ConvFeatureGroupCount), (ConvBatchGroupCount), (ResultDotPrec)),

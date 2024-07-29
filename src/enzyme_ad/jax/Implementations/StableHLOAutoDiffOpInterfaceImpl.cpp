@@ -195,6 +195,26 @@ public:
   }
 };
 
+class AutoDiffSortRev
+    : public ReverseAutoDiffOpInterface::ExternalModel<AutoDiffSortRev,
+                                                       SortOp> {
+public:
+  LogicalResult createReverseModeAdjoint(Operation *orig, OpBuilder &builder,
+                                         MGradientUtilsReverse *gutils,
+                                         SmallVector<Value> caches) const {
+    auto op = cast<SortOp>(orig);
+    return success();
+  }
+
+  SmallVector<Value> cacheValues(Operation *orig,
+                                 MGradientUtilsReverse *gutils) const {
+    return {};
+  }
+
+  void createShadowValues(Operation *op, OpBuilder &builder,
+                          MGradientUtilsReverse *gutils) const {}
+};
+
 class AutoDiffBroadcastInDimRev
     : public ReverseAutoDiffOpInterface::ExternalModel<
           AutoDiffBroadcastInDimRev, BroadcastInDimOp> {
@@ -509,6 +529,7 @@ void mlir::enzyme::registerStableHLODialectAutoDiffInterface(
         ReduceOp::attachInterface<AutoDiffReduceFwd<ReduceOp>>(*context);
         ReduceOp::attachInterface<AutoDiffReduceCF<ReduceOp>>(*context);
         BroadcastInDimOp::attachInterface<AutoDiffBroadcastInDimRev>(*context);
+        SortOp::attachInterface<AutoDiffSortRev>(*context);
         SliceOp::attachInterface<AutoDiffSliceRev>(*context);
         ReduceOp::attachInterface<AutoDiffReduceRev>(*context);
         ConcatenateOp::attachInterface<AutoDiffConcatenateRev>(*context);
