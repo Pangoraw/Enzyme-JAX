@@ -63,7 +63,7 @@ http_archive(
     name = "enzyme",
     sha256 = ENZYME_SHA256,
     strip_prefix = "Enzyme-" + ENZYME_COMMIT + "/enzyme",
-    urls = ["https://github.com/EnzymeAD/Enzyme/archive/{commit}.tar.gz".format(commit = ENZYME_COMMIT)],
+    urls = ["https://github.com/Pangoraw/Enzyme/archive/{commit}.tar.gz".format(commit = ENZYME_COMMIT)],
 )
 
 load("@xla//third_party/llvm:workspace.bzl", llvm = "repo")

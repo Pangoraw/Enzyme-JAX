@@ -658,6 +658,8 @@ def : HLODerivative<"FftOp", (Op $x),
 
 def : HLOInactiveOp<"FloorOp">;
 
+def : HLODerivative<"ImagOp", (Op $x), [(Complex (HLOConstantFP<"0">), (DiffeRet))]>;
+
 def : HLOInactiveOp<"IotaOp">;
 
 def : HLOInactiveOp<"IsFiniteOp">;
@@ -706,6 +708,8 @@ def : HLODerivative<"PowOp", (Op $x, $y),
                     (CheckedMul (DiffeRet), (Mul (Pow $x, $y), (Log $x)))
                   ]
                   >;
+
+def : HLODerivative<"RealOp", (Op $x), [(Complex (DiffeRet), (HLOConstantFP<"0">))]>;
 
 def : HLOReadOnlyIdentityOp<"ReshapeOp", [0], (Op $x), [(Reshape (TypeOf $x), (DiffeRet))]>;
 
