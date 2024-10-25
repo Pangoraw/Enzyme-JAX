@@ -43,6 +43,9 @@
 
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/reference/InterpreterOps.h"
+#include "stablehlo/reference/InterpreterPasses.h"
+#include "stablehlo/tests/CheckOps.h"
 
 #include "xla/mlir_hlo/mhlo/IR/hlo_ops.h"
 
@@ -87,6 +90,8 @@ int main(int argc, char **argv) {
   registry.insert<mlir::mhlo::MhloDialect>();
   registry.insert<mlir::stablehlo::StablehloDialect>();
   registry.insert<mlir::chlo::ChloDialect>();
+  registry.insert<mlir::stablehlo::interpreter::InterpreterDialect>();
+  registry.insert<mlir::stablehlo::check::CheckDialect>();
 
   registry.insert<mlir::enzyme::EnzymeDialect>();
 
@@ -107,6 +112,7 @@ int main(int argc, char **argv) {
   mlir::registerConvertSCFToOpenMPPass();
   mlir::affine::registerAffinePasses();
   mlir::registerReconcileUnrealizedCasts();
+  mlir::stablehlo::registerInterpreterTransformsPasses();
 
   registry.addExtension(+[](MLIRContext *ctx, LLVM::LLVMDialect *dialect) {
     LLVM::LLVMFunctionType::attachInterface<MemRefInsider>(*ctx);
