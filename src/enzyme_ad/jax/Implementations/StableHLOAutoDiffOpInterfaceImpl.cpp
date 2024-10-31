@@ -297,6 +297,84 @@ public:
                           MGradientUtilsReverse *gutils) const {}
 };
 
+class SHLOIfOpBatchInterface
+    : public BatchOpInterface::ExternalModel<SHLOIfOpBatchInterface, IfOp> {
+public:
+  mlir::Operation *createBatch(Operation *src, IRMapping &mapper,
+                               Operation::CloneOptions options,
+                               std::map<Operation *, Operation *> &opMap,
+                               ArrayRef<int64_t> batchSizes) const {
+    SmallVector<Type> resultTypes(src->getResultTypes().begin(),
+                                  src->getResultTypes().end());
+    for (auto &Ty : resultTypes) {
+      auto T = cast<TensorType>(Ty);
+      SmallVector<int64_t> shape(batchSizes.begin(), batchSizes.end());
+      shape.append(T.getShape().begin(), T.getShape().end());
+      Ty = T.clone(shape);
+    }
+
+    auto op = cast<IfOp>(src);
+
+    SmallVector<int64_t> dims;
+    for (int i = 0; i < batchSizes.size(); ++i) {
+      dims.push_back(i);
+    }
+
+    mlir::NamedAttrList attrs;
+    attrs.append(mlir::NamedAttribute(
+        mlir::StringAttr::get(src->getContext(), "dimensions"),
+        DenseI64ArrayAttr::get(src->getContext(), dims)));
+
+    Operation *mapOp = mlir::Operation::create(
+        src->getLoc(), mlir::OperationName("stablehlo.map", src->getContext()),
+        resultTypes, {}, std::move(attrs), OpaqueProperties(nullptr),
+        mlir::BlockRange(), 1);
+
+    auto &region = mapOp->getRegion(0);
+
+    assert(region.empty());
+    auto innerBlock = new Block();
+    region.push_back(innerBlock);
+
+    IRMapping usedValues;
+
+    SmallVector<Value> operands;
+
+    auto pred = op.getPred();
+    operands.push_back(mapper.lookup(op.getPred()));
+    usedValues.map(op.getPred(),
+                   innerBlock->addArgument(pred.getType(), src->getLoc()));
+
+    for (auto &reg : src->getRegions()) {
+      if (reg.empty())
+        continue;
+
+      assert(reg.hasOneBlock());
+      Block *block = &reg.front();
+      for (auto &op : block->getOperations()) {
+        for (auto operand : op.getOperands()) {
+          if (operand.getParentRegion() != reg) {
+            operands.push_back(mapper.lookup(operand));
+            usedValues.map(operand, innerBlock->addArgument(operand.getType(),
+                                                            src->getLoc()));
+          }
+        }
+      }
+    }
+
+    mapOp->setOperands(operands);
+
+    mapOp->dump();
+
+    OpBuilder innerBlockBuilder(innerBlock, innerBlock->end());
+
+    auto newOp = innerBlockBuilder.clone(*src, usedValues);
+    innerBlockBuilder.create<ReturnOp>(src->getLoc(), newOp->getResults());
+
+    return mapOp;
+  }
+};
+
 class AutoDiffWhileFwd
     : public AutoDiffOpInterface::ExternalModel<AutoDiffWhileFwd, WhileOp> {
 public:
@@ -1106,6 +1184,7 @@ void mlir::enzyme::registerStableHLODialectAutoDiffInterface(
         IfOp::attachInterface<AutoDiffIfRev>(*context);
         IfOp::attachInterface<AutoDiffIfFwd>(*context);
         IfOp::attachInterface<AutoDiffIfCF>(*context);
+        IfOp::attachInterface<SHLOIfOpBatchInterface>(*context);
         WhileOp::attachInterface<AutoDiffWhileFwd>(*context);
         ReduceOp::attachInterface<AutoDiffReduceCF<ReduceOp>>(*context);
         WhileOp::attachInterface<AutoDiffReduceCF<WhileOp>>(*context);
