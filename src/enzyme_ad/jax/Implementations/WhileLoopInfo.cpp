@@ -47,6 +47,7 @@ LogicalResult WhileLoopInfo::computeInfo() {
   step = inc.getOperand(1);
   start = op->getOperand(induct.getArgNumber());
   limit = cond.getOperand(1);
+  inductionArgNumber = incba.getArgNumber();
 
   return success();
 }
@@ -70,6 +71,11 @@ std::optional<int64_t> WhileLoopInfo::getConstantLimit() {
   if (!matchPattern(limit, m_Constant(&limitAttr)))
     return std::nullopt;
   return (*limitAttr.begin()).getSExtValue();
+}
+
+int64_t WhileLoopInfo::getConstantNumIters() {
+  return (getConstantLimit().value() - getConstantStart().value()) /
+         getConstantStep().value();
 }
 
 Value WhileLoopInfo::getNumIters(mlir::OpBuilder &builder) {
