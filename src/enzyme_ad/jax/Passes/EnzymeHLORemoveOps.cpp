@@ -36,6 +36,335 @@ using namespace enzyme;
 
 namespace {
 
+/// Information about a cache, each cache init should have one corresponding
+/// push and pop.
+struct CacheInfo {
+  enzyme::InitOp initOp;
+  enzyme::PushOp pushOp = {};
+  enzyme::PopOp popOp = {};
+
+  CacheInfo(enzyme::InitOp initOp_) : initOp(initOp_) {
+    Value cache = initOp.getResult();
+    unsigned nusers = 0;
+    for (auto user : cache.getUsers()) {
+      nusers++;
+      if (!popOp)
+        popOp = dyn_cast<enzyme::PopOp>(user);
+      if (!pushOp)
+        pushOp = dyn_cast<enzyme::PushOp>(user);
+    }
+    assert(nusers == 2);
+  }
+
+  // The cache can trivially be eliminated.
+  LogicalResult optimizeOut() {
+    if (pushOp->getBlock() == popOp->getBlock()) {
+      popOp->getResult(0).replaceAllUsesWith(pushOp->getOperand(1));
+
+      popOp->erase();
+      pushOp->erase();
+      initOp->erase();
+
+      return success();
+    }
+
+    return failure();
+  }
+
+  LogicalResult cachePushOutside() {
+    auto parent = pushOp->getParentOp();
+    return moveCachesOutside(parent, *this);
+  }
+};
+
+// Operation is operation containing the caches pushes, other is the operation
+// containing the pops.
+LogicalResult moveCachesOutside(Operation *operation, Operation *other,
+                                SmallVectorImpl<CacheInfo> &caches) {
+  if (auto ifOp = dyn_cast<stablehlo::IfOp>(operation)) {
+    auto otherIfOp = cast<stablehlo::IfOp>(other);
+
+    // First put the pushes after the if op.
+    {
+      OpBuilder builder(operation);
+
+      auto trueBlock = &ifOp.getTrueBranch().front();
+      auto falseBlock = &ifOp.getFalseBranch().front();
+
+      SmallVector<Value> newTrueReturns;
+      SmallVector<Value> newFalseReturns;
+      for (auto cache : caches) {
+        auto intrue = cache.pushOp->getBlock() == trueBlock;
+
+        auto Ty =
+            cast<AutoDiffTypeInterface>(cache.pushOp->getOperand(1).getType());
+        Value nullValue = Ty.createNullValue(builder, cache.pushOp->getLoc());
+
+        if (intrue) {
+          newTrueReturns.push_back(cache.pushOp->getOperand(1));
+          newFalseReturns.push_back(nullValue);
+        } else {
+          newTrueReturns.push_back(nullValue);
+          newFalseReturns.push_back(cache.pushOp->getOperand(1));
+        }
+      }
+
+      auto trueTerm = trueBlock->getTerminator();
+      auto falseTerm = falseBlock->getTerminator();
+
+      trueTerm->insertOperands(trueTerm->getNumOperands(), newTrueReturns);
+      falseTerm->insertOperands(falseTerm->getNumOperands(), newFalseReturns);
+
+      auto newIfOp = builder.create<stablehlo::IfOp>(
+          ifOp->getLoc(), ValueRange(trueTerm->getOperands()).getTypes(),
+          ifOp.getCond());
+      newIfOp.getTrueBranch().takeBody(ifOp.getTrueBranch());
+      newIfOp.getFalseBranch().takeBody(ifOp.getFalseBranch());
+
+      for (auto &&[oldRes, newRes] :
+           llvm::zip(ifOp->getResults(), newIfOp->getResults())) {
+        oldRes.replaceAllUsesWith(newRes);
+      }
+
+      auto idx = ifOp->getNumResults();
+      for (auto &cache : caches) {
+        auto newPushOp = builder.create<enzyme::PushOp>(
+            cache.pushOp->getLoc(), cache.initOp.getResult(),
+            newIfOp->getResult(idx));
+
+        cache.pushOp->erase();
+        cache.pushOp = newPushOp;
+
+        idx++;
+      }
+
+      ifOp->erase();
+    }
+
+    // Second, put the pop ops before the other if
+    {
+      OpBuilder builder(otherIfOp);
+      for (auto &cache : caches) {
+        auto newPopOp = builder.create<enzyme::PopOp>(
+            cache.popOp->getLoc(), cache.popOp->getOperand(0));
+
+        cache.popOp.getResult().replaceAllUsesWith(newPopOp.getResult());
+        cache.popOp->erase();
+
+        cache.popOp = newPopOp;
+      }
+    }
+
+    return success();
+  }
+
+  if (auto whileOp = dyn_cast<stablehlo::WhileOp>(operation)) {
+    auto otherWhileOp = cast<stablehlo::WhileOp>(other);
+
+    WhileLoopInfo info(whileOp), otherInfo(otherWhileOp);
+    if (info.computeInfo().failed() || otherInfo.computeInfo().failed() ||
+        !info.isConstant() || !otherInfo.isConstant())
+      return failure();
+
+    auto numIters = info.getConstantNumIters();
+    if (numIters != otherInfo.getConstantNumIters())
+      return failure();
+
+    // Replace the caches by a tensor of size num iters
+    //
+    // pushes become a dynamic_update_slice based on the induction variable.
+    // and a push after the while.
+    //
+    // pops become a dynamic_slice based on the induction variable from a pop
+    // located before the while.
+    {
+      SmallVector<Value> newOperands;
+      OpBuilder builder(whileOp);
+
+      auto cond = &whileOp.getCond().front();
+      auto body = &whileOp.getBody().front();
+
+      for (auto &cache : caches) {
+        auto Ty = cast<mlir::TensorType>(
+            cast<enzyme::CacheType>(cache.initOp.getResult().getType())
+                .getType());
+
+        SmallVector<int64_t> shape;
+        shape.push_back(numIters);
+        shape.append(Ty.getShape().begin(), Ty.getShape().end());
+        auto newTy = Ty.clone(shape);
+
+        enzyme::InitOp newInitOp;
+        {
+          OpBuilder::InsertionGuard guard(builder);
+          builder.setInsertionPoint(cache.initOp);
+
+          newInitOp = builder.create<enzyme::InitOp>(
+              cache.initOp->getLoc(),
+              enzyme::CacheType::get(op->getContext(), newTy));
+        }
+
+        cond->addArgument(newTy, op->getLoc());
+        Value newCacheValue = body->addArgument(newTy, op->getLoc());
+
+        auto cacheInit = cast<AutoDiffTypeInterface>(newTy).createNullValue(
+            builder, cache.pushOp->getLoc());
+
+        whileOp->insertOperands(whileOp->getNumOperands(),
+                                ValueRange(cacheInit));
+
+        {
+          OpBuilder::InsertionGuard guard(builder);
+          builder.setInsertionPoint(cache.pushOp);
+
+          SmallVector<Value> indices;
+          indices.push_back(body->getArgument(info.inductionArgNumber));
+
+          auto zero = ({
+            auto I64Ty = builder.getI64Type();
+            auto unrankedTensorType = RankedTensorType::get({}, I64Ty);
+            builder
+                .create<ConstantOp>(
+                    op->getLoc(), unrankedTensorType,
+                    SplatElementsAttr::get(
+                        unrankedTensorType,
+                        ArrayRef<Attribute>(IntegerAttr::get(I64Ty, 0))))
+                .getResult();
+          });
+          for (int i = 0, e = shape.size() - 1; i < e; ++i) {
+            indices.push_back(zero);
+          }
+
+          shape.clear();
+          shape.push_back(1);
+          shape.append(Ty.getShape().begin(), Ty.getShape().end());
+
+          Value update = builder.create<stablehlo::ReshapeOp>(
+              op->getLoc(), Ty.clone(shape), op->getOperand(1));
+          newCacheValue = builder.create<stablehlo::DynamicUpdateSliceOp>(
+              op->getLoc(), newCacheValue, update, indices);
+
+          auto term = body->getTerminator();
+          term->insertOperands(term->getNumOperands(),
+                               ValueRange(newCacheValue));
+
+          cache.pushOp->erase();
+          cache.pushOp = {}; // will be set when generating new while ops
+        }
+
+        // For the other a push before
+        {
+          OpBuilder::InsertionGuard guard(builder);
+          builder.setInsertionPoint(otherWhileOp);
+
+          auto newPopOp = builder.create<enzyme::PopOp>(popOp->getLoc(), newTy,
+                                                        newInitOp.getResult());
+
+          otherWhileOp->insertOperands(otherWhileOp->getNumOperands(),
+                                       newInitOp.getResult());
+
+          auto cond = &otherWhileOp.getCond().front();
+          auto body = &otherWhileOp.getCond().front();
+
+          cond->addArgument(newTy, cache.popOp->getLoc());
+          auto newCacheValue = body->addArgument(newTy, cache.popOp->getLoc());
+
+          builder.setInsertionPoint(cache.popOp);
+
+          auto numItersValue = ({
+            auto I64Ty = builder.getI64Type();
+            auto unrankedTensorType = RankedTensorType::get({}, I64Ty);
+            builder
+                .create<ConstantOp>(
+                    op->getLoc(), unrankedTensorType,
+                    SplatElementsAttr::get(
+                        unrankedTensorType,
+                        ArrayRef<Attribute>(IntegerAttr::get(I64Ty, numIters))))
+                .getResult();
+          });
+          auto zero = ({
+            auto I64Ty = builder.getI64Type();
+            auto unrankedTensorType = RankedTensorType::get({}, I64Ty);
+            builder
+                .create<ConstantOp>(
+                    op->getLoc(), unrankedTensorType,
+                    SplatElementsAttr::get(
+                        unrankedTensorType,
+                        ArrayRef<Attribute>(IntegerAttr::get(I64Ty, 0))))
+                .getResult();
+          });
+
+          auto popWhileBody = &popWhile.getBody().front();
+
+          auto idx = builder.create<stablehlo::SubtractOp>(
+              popOp->getLoc(), numItersValue,
+              popWhileBody->getArgument(info.inductionArgNumber));
+
+          indices.clear();
+          indices.push_back(idx);
+          for (int i = 0, e = Ty.getShape().size(); i < e; ++i) {
+            indices.push_back(zero);
+          }
+
+          Value newValue = builder.create<stablehlo::DynamicSliceOp>(
+              popOp->getLoc(), newPopOp.getResult(), indices, shape);
+          newValue = builder.create<stablehlo::ReshapeOp>(popOp->getLoc(), Ty,
+                                                          newValue);
+
+          popOp.getResult().replaceAllUsesWith(newValue);
+          cache.popOp->erase();
+          cache.popOp = newPopOp;
+        }
+
+        cache.initOp->erase();
+        cache.initOp = newInitOp;
+      }
+
+      // Generate new versions of while loops
+
+      auto newWhileOp = builder.create<stablehlo::WhileOp>(
+          whileOp->getLoc(), ValueRange(whileOp->getOperands()).getTypes(),
+          whileOp->getOperands());
+      newWhileOp.getCond().takeBody(whileOp.getCond());
+      newWhileOp.getBody().takeBody(whileOp.getBody());
+
+      for (auto &&[oldRes, newRes] :
+           llvm::zip(whileOp->getResults(), newWhileOp->getResults())) {
+        oldRes.replaceAllUsesWith(newRes);
+      }
+
+      unsigned resultIdx = whileOp->getNumOperands();
+      for (auto &cache : caches) {
+        builder.setInsertionPointAfter(newWhileOp);
+        cache.pushOp = builder.create<enzyme::PushOp>(
+            newCache.getDefiningOp()->getLoc(), newCache,
+            newWhileOp->getResult(resultIdx));
+        resultIdx++;
+      }
+
+      whileOp->erase();
+
+      auto newOtherWhileOp = builder.create<stablehlo::WhileOp>(
+          otherWhileOp->getLoc(),
+          ValueRange(otherWhileOp->getOperands()).getTypes(),
+          otherWhileOp->getOperands());
+      newOtherWhileOp.getCond().takeBody(otherWhileOp.getCond());
+      newOtherWhileOp.getBody().takeBody(otherWhileOp.getBody());
+
+      for (auto &&[oldRes, newRes] : llvm::zip(otherWhileOp->getResults(),
+                                               newOtherWhileOp->getResults())) {
+        oldRes.replaceAllUsesWith(newRes);
+      }
+
+      otherWhileOp->erase();
+    }
+
+    return success();
+  }
+
+  return failure();
+}
+
 static enzyme::PopOp findCorrespondingPop(enzyme::PushOp op) {
   auto cache = op.getCache();
   unsigned nusers = 0;
