@@ -6248,6 +6248,20 @@ struct GetDimensionSizeOpCanon final
   }
 };
 
+struct NoopReverse final : OpRewritePattern<mlir::stablehlo::ReverseOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReverseOp op,
+                                PatternRewriter &rewriter) const override {
+    auto dimensions = op.getDimensions();
+    if (!dimensions.empty())
+      return failure();
+
+    rewriter.replaceAllUsesWith(op.getResult(), op.getOperand());
+    return success();
+  }
+};
+
 /// Converts gather ops to slice ops in case we have a single set of constant
 /// indices.
 struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
@@ -6655,7 +6669,7 @@ struct EnzymeHLOOptPass : public EnzymeHLOOptPassBase<EnzymeHLOOptPass> {
         .add<AddSimplify, SubSimplify, AndSimplify, MaxSimplify, MinSimplify,
              OrSimplify, NegateSimplify, MulSimplify, DivSimplify, RemSimplify,
              PowSimplify, SqrtSimplify, CosSimplify, SinSimplify, NoopSlice,
-             SliceSlice, PadSimplify, ShiftRightLogicalSimplify,
+             NoopReverse, SliceSlice, PadSimplify, ShiftRightLogicalSimplify,
              NegativePadToSlice, TanhSimplify, ExpSimplify, SliceSimplify,
              ConvertSimplify, TransposeSimplify, DotGeneralSimplify,
              DynamicSliceToStatic, DynamicUpdateSliceElim, ReduceToReshape,
