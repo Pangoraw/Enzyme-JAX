@@ -795,10 +795,12 @@ tryRaisingOpToStableHLO(Operation *op, IRMapping &mapping, OpBuilder &builder,
   // Affine if (only pure ops with yield is currently supported)
   if (auto ifOp = dyn_cast<affine::AffineIfOp>(op)) {
     if (!ifOp.hasElse() || ifOp->getNumResults() == 0 ||
-        llvm::any_of(*ifOp.getThenBlock(),
-                     [](Operation &op) { return !mlir::isPure(&op); }) ||
-        llvm::any_of(*ifOp.getElseBlock(),
-                     [](Operation &op) { return !mlir::isPure(&op); })) {
+        llvm::any_of(
+            *ifOp.getThenBlock(),
+            [](Operation &op) { return !mlir::isSpeculatable(&op); }) ||
+        llvm::any_of(*ifOp.getElseBlock(), [](Operation &op) {
+          return !mlir::isSpeculatable(&op);
+        })) {
       LLVM_DEBUG(llvm::dbgs()
                  << "cannot raise if yet (non-pure or yielded values): " << *op
                  << "\n");
