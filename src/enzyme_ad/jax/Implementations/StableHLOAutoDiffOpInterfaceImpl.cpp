@@ -641,13 +641,7 @@ class AutoDiffWhileRev
     int64_t numIters = revInfo.info.getConstantNumIters();
     int64_t nInner = std::sqrt(numIters);
     int64_t nOuter = nInner;
-    if (nInner * nOuter != revInfo.info.getConstantNumIters()) {
-      orig->emitError()
-          << "Non square number of iterations for checkpointing, nInner="
-          << nInner << " nOuter=" << nOuter
-          << " iters=" << revInfo.info.getConstantNumIters() << "\n";
-      return failure();
-    }
+    int64_t trailingIters = numIters - nOuter * nInner;
 
     SetVector<Value> outsideRefs;
     getUsedValuesDefinedAbove(orig->getRegions(), outsideRefs);
@@ -708,7 +702,22 @@ class AutoDiffWhileRev
       carried.push_back(cacheVals[i]);
     }
 
-    auto revInner = makeForLoop(builder, orig.getLoc(), 0, nInner, 1, carried);
+    Value nInnerUB = makeI64Constant(orig.getLoc(), builder, nInner),
+          zero = makeI64Constant(orig.getLoc(), builder, 0),
+          one = makeI64Constant(orig.getLoc(), builder, 1);
+
+    if (trailingIters > 0) {
+      Location loc = orig.getLoc();
+      nInnerUB = builder.create<stablehlo::SelectOp>(
+          loc,
+          builder.create<stablehlo::CompareOp>(
+              loc, zero, revOuterBody->getArgument(0), ComparisonDirection::eq),
+          makeI64Constant(loc, builder, trailingIters),
+          makeI64Constant(loc, builder, nInner));
+    }
+
+    auto revInner =
+        makeForLoop(builder, orig.getLoc(), zero, nInnerUB, one, carried);
     Block *revInnerBody = &revInner.getBody().front();
 
     revInner->setAttrs(orig->getAttrs());
@@ -1046,8 +1055,9 @@ public:
           // sqrt scheme
           int64_t nInner = std::sqrt(info.getConstantNumIters());
           int64_t nOuter = nInner;
+          int64_t trailingIters = info.getConstantNumIters() - nInner * nOuter;
 
-          if (nInner * nOuter != info.getConstantNumIters()) {
+          if (trailingIters > 0) {
             orig->emitError()
                 << "Non square number of iterations for checkpointing, nInner="
                 << nInner << " nOuter=" << nOuter
@@ -1080,8 +1090,24 @@ public:
             SmallVector<Value> operands(
                 outerBody->getArguments().slice(1).begin(),
                 outerBody->getArguments().slice(1).end());
+
+            Value nInnerUB = makeI64Constant(orig.getLoc(), builder, nInner),
+                  zero = makeI64Constant(orig.getLoc(), builder, 0),
+                  one = makeI64Constant(orig.getLoc(), builder, 1);
+
+            if (trailingIters > 0) {
+              Location loc = orig.getLoc();
+              nInnerUB = builder.create<stablehlo::SelectOp>(
+                  loc,
+                  builder.create<stablehlo::CompareOp>(
+                      loc, makeI64Constant(loc, builder, nOuter - 1),
+                      revOuterBody->getArgument(0), ComparisonDirection::eq),
+                  makeI64Constant(loc, builder, trailingIters),
+                  makeI64Constant(loc, builder, nInner));
+            }
+
             auto inner =
-                makeForLoop(builder, orig->getLoc(), 0, nInner, 1, operands);
+                makeForLoop(builder, orig->getLoc(), 0, nInnerUB, 1, operands);
 
             outerBody->getTerminator()->setOperands(
                 1, inner.getNumResults() - 1,
@@ -2732,9 +2758,9 @@ private:
       OP,
     } type;
 
-    Node(Operation *O) : O(O), type(OP){};
-    Node(Value V) : V(V), type(VAL){};
-    Node() : type(NONE){};
+    Node(Operation *O) : O(O), type(OP) {};
+    Node(Value V) : V(V), type(VAL) {};
+    Node() : type(NONE) {};
 
     bool operator<(const Node N) const {
       if (type != N.type)
