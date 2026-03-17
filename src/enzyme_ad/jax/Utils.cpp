@@ -3139,9 +3139,87 @@ Value ReshapeOpCreate(OpBuilder &builder, Location loc, Value input,
     return input;
   }
 
-  auto reshapeOp = stablehlo::ReshapeOp::create(
-      builder, loc, RankedTensorType::get(shape, inputTy.getElementType()),
-      input);
+  RankedTensorType resultTy =
+      RankedTensorType::get(shape, inputTy.getElementType());
+
+  if (!resultTy.hasStaticShape()) {
+    assert(!inputTy.hasStaticShape());
+
+    int64_t inputDynDim = -1, numStaticInputElements = 1;
+    for (auto [i, sz] : llvm::enumerate(inputTy.getShape())) {
+      if (sz == ShapedType::kDynamic) {
+        if (inputDynDim != -1)
+          llvm_unreachable("unsupported: multiple dynamic input dimensions");
+        inputDynDim = i;
+      } else {
+        numStaticInputElements *= sz;
+      }
+    }
+
+    int64_t outputDynDim = -1, numStaticOutputElements = 1;
+    for (auto [i, sz] : llvm::enumerate(shape)) {
+      if (sz == ShapedType::kDynamic) {
+        if (outputDynDim != -1)
+          llvm_unreachable("unsupported: multiple dynamic output dimensions");
+        outputDynDim = i;
+      } else {
+        numStaticOutputElements *= sz;
+      }
+    }
+
+    // GetDimensionSizeOp returns tensor<index_type> (typically tensor<i32>)
+    Value dimSize = stablehlo::GetDimensionSizeOp::create(
+        builder, loc, input, builder.getI64IntegerAttr(inputDynDim));
+    auto shapeElemType =
+        cast<RankedTensorType>(dimSize.getType()).getElementType();
+
+    // outputDynDimSize = inputDynDimSize * numStaticInputElements /
+    // numStaticOutputElements
+    Value outputDynSize = dimSize;
+    if (numStaticInputElements > numStaticOutputElements) {
+      int64_t ratio = numStaticInputElements / numStaticOutputElements;
+      Value ratioConst = stablehlo::ConstantOp::create(
+          builder, loc, makeAttr(dimSize.getType(), ratio));
+      outputDynSize =
+          stablehlo::MulOp::create(builder, loc, dimSize, ratioConst);
+    } else if (numStaticOutputElements > numStaticInputElements) {
+      int64_t ratio = numStaticOutputElements / numStaticInputElements;
+      Value ratioConst = stablehlo::ConstantOp::create(
+          builder, loc, makeAttr(dimSize.getType(), ratio));
+      outputDynSize =
+          stablehlo::DivOp::create(builder, loc, dimSize, ratioConst);
+    }
+
+    // Build constant shape tensor with 0 as placeholder for the dynamic dim.
+    // Element type matches GetDimensionSizeOp output (e.g. i32).
+    auto shapeTensorTy =
+        RankedTensorType::get({(int64_t)shape.size()}, shapeElemType);
+    SmallVector<int32_t> staticShapeVals;
+    for (auto sz : shape)
+      staticShapeVals.push_back(sz == ShapedType::kDynamic ? 0 : sz);
+    Value shapeVal = stablehlo::ConstantOp::create(
+        builder, loc,
+        DenseIntElementsAttr::get(shapeTensorTy, staticShapeVals));
+
+    Value outputDynSizeSlice = stablehlo::ReshapeOp::create(
+        builder, loc, RankedTensorType::get({1}, shapeElemType), outputDynSize);
+
+    Value startIndex = stablehlo::ConstantOp::create(
+        builder, loc,
+        makeAttr(RankedTensorType::get({}, shapeElemType), outputDynDim));
+
+    shapeVal = stablehlo::DynamicUpdateSliceOp::create(
+        builder, loc, shapeVal, outputDynSizeSlice, ValueRange{startIndex});
+
+    auto dynReshape = stablehlo::DynamicReshapeOp::create(
+        builder, loc, resultTy, input, shapeVal);
+    if (sharding.has_value()) {
+      sdy::setShardings(dynReshape, *sharding);
+    }
+    return dynReshape.getResult();
+  }
+
+  auto reshapeOp = stablehlo::ReshapeOp::create(builder, loc, resultTy, input);
   if (sharding.has_value()) {
     sdy::setShardings(reshapeOp, *sharding);
   }
