@@ -53,7 +53,6 @@ jobs:
 
         reactant_commit:
           - 'main'
-          - 'mst3'
 
     steps:
       - name: Check GPUs
