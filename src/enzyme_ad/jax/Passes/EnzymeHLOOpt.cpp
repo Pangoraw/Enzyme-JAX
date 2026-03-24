@@ -1517,7 +1517,7 @@ struct LowerPiecewiseSelect
                                     PatternRewriter &rewriter) const {
     Value condition;
     for (Attribute box : op.getBoxes()) {
-      SmallVector boxCoords = llvm::map_to_vector(
+      SmallVector<int64_t> boxCoords = llvm::map_to_vector(
           cast<ArrayAttr>(box).getAsValueRange<IntegerAttr>(),
           [](APInt apInt) { return apInt.getSExtValue(); });
       Value boxCondition = createInBoxCondition(
