@@ -17,6 +17,7 @@
 #include "polly/Support/ScopHelper.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Dominators.h"
 
 namespace polly {
 using llvm::AllocaInst;
