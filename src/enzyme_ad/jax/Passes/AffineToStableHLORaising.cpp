@@ -1801,8 +1801,8 @@ tryRaisingOpToStableHLO(Operation *op, IRMapping &mapping, OpBuilder &builder,
     });
     bool emitAsGather =
         affineMapToSlice(accessValueMap, strides, reverseDims, pc).failed() ||
-        dynIndices &&
-            llvm::any_of(strides, [](int64_t stride) { return stride != 1; }) ||
+        (dynIndices &&
+         llvm::any_of(strides, [](int64_t stride) { return stride != 1; })) ||
         needsGeneralScatterGather(accessValueMap);
 
     if (emitAsGather) {
