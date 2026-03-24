@@ -12,5 +12,9 @@ cc_library(
     # ],
     deps = [
         "//src/external/isl:Isl",
+        "@llvm-project//llvm:Analysis",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:Passes",
+        "@llvm-project//llvm:Support",
     ],
 )
