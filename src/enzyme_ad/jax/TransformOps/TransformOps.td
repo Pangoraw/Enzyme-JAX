@@ -253,6 +253,10 @@ def ApplyGeluConstProp : EnzymeHLOPatternOp<
     "gelu_const_prop">{
   let patterns = ["GeluConstProp"];
 }
+def ApplyTGammaConstProp : EnzymeHLOPatternOp<
+    "tgamma_const_prop">{
+  let patterns = ["TGammaConstProp"];
+}
 def ApplySoftplusConstProp : EnzymeHLOPatternOp<
     "softplus_const_prop">{
   let patterns = ["UnaryConstProp<enzymexla::SoftplusOp,softplusOp>"];
