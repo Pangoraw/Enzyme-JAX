@@ -4,6 +4,7 @@
 // RUN: enzymexlamlir-opt %s --enzyme-wrap="infn=gelu_sigmoid_fn outfn= retTys=enzyme_active argTys=enzyme_active mode=ReverseModeCombined" --canonicalize --remove-unnecessary-enzyme-ops --arith-raise --lower-enzymexla-ml | FileCheck %s --check-prefix=GELU-SIGMOID-REV
 // RUN: enzymexlamlir-opt %s --enzyme-wrap="infn=softplus_fn outfn= retTys=enzyme_active argTys=enzyme_active mode=ReverseModeCombined" --canonicalize --remove-unnecessary-enzyme-ops --arith-raise --lower-enzymexla-ml | FileCheck %s --check-prefix=SOFTPLUS-REV
 // RUN: enzymexlamlir-opt %s --enzyme-wrap="infn=tgamma_fn outfn= retTys=enzyme_active argTys=enzyme_active mode=ReverseModeCombined" --canonicalize --remove-unnecessary-enzyme-ops --arith-raise --lower-enzymexla-ml | FileCheck %s --check-prefix=TGAMMA-REV
+// RUN: enzymexlamlir-opt %s --enzyme-wrap="infn=lgamma_fn outfn= retTys=enzyme_active argTys=enzyme_active mode=ReverseModeCombined" --canonicalize --remove-unnecessary-enzyme-ops --arith-raise --lower-enzymexla-ml | FileCheck %s --check-prefix=LGAMMA-REV
 // RUN: enzymexlamlir-opt %s --enzyme --canonicalize --remove-unnecessary-enzyme-ops --lower-enzymexla-ml --chlo-legalize-to-stablehlo --canonicalize --arith-raise | stablehlo-translate - --interpret
 
 module {
@@ -34,6 +35,11 @@ module {
 
   func.func @tgamma_fn(%x: tensor<6xf32>) -> tensor<6xf32> {
     %0 = enzymexla.ml.tgamma %x : (tensor<6xf32>) -> tensor<6xf32>
+    return %0 : tensor<6xf32>
+  }
+
+  func.func @lgamma_fn(%x: tensor<6xf32>) -> tensor<6xf32> {
+    %0 = enzymexla.ml.lgamma %x : (tensor<6xf32>) -> tensor<6xf32>
     return %0 : tensor<6xf32>
   }
 
@@ -82,6 +88,14 @@ module {
       ret_activity = [#enzyme<activity enzyme_active>]
     } : (tensor<6xf32>, tensor<6xf32>) -> (tensor<6xf32>, tensor<6xf32>)
     check.expect_almost_eq_const %tgamma_res#1, dense<[-0.577215672, 0.422784328, 1.84556866, 7.53670597, 36.1468239, 204.734329]> : tensor<6xf32>
+
+    // d/dx lgamma(x) = polygamma(0, x) = digamma(x)
+    %x_lgamma = stablehlo.constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32>
+    %lgamma_res:2 = enzyme.autodiff @lgamma_fn(%x_lgamma, %d_common) {
+      activity = [#enzyme<activity enzyme_active>],
+      ret_activity = [#enzyme<activity enzyme_active>]
+    } : (tensor<6xf32>, tensor<6xf32>) -> (tensor<6xf32>, tensor<6xf32>)
+    check.expect_almost_eq_const %lgamma_res#1, dense<[-0.577215672, 0.422784328, 0.922784328, 1.25611770, 1.50611770, 1.70611768]> : tensor<6xf32>
 
     return
   }
@@ -182,3 +196,10 @@ module {
 // TGAMMA-REV: %[[INNER:.*]] = stablehlo.multiply %[[TGAMMA]], %[[PG]] : tensor<6xf32>
 // TGAMMA-REV: %[[OUTER:.*]] = stablehlo.multiply %[[DR]], %[[INNER]] : tensor<6xf32>
 // TGAMMA-REV: stablehlo.add %[[OUTER]], %[[ZERO]] : tensor<6xf32>
+
+// LGAMMA-REV-LABEL: func.func @lgamma_fn(%arg0: tensor<6xf32>, %arg1: tensor<6xf32>) -> tensor<6xf32>
+// LGAMMA-REV-DAG: %[[ZERO:.*]] = stablehlo.constant dense<0.000000e+00> : tensor<6xf32>
+// LGAMMA-REV: %[[DR:.*]] = stablehlo.add %arg1, %[[ZERO]] : tensor<6xf32>
+// LGAMMA-REV: %[[DG:.*]] = chlo.digamma %arg0 : tensor<6xf32> -> tensor<6xf32>
+// LGAMMA-REV: %[[SCALED:.*]] = stablehlo.multiply %[[DR]], %[[DG]] : tensor<6xf32>
+// LGAMMA-REV: stablehlo.add %[[SCALED]], %[[ZERO]] : tensor<6xf32>

@@ -80,6 +80,19 @@ struct LowerTGammaOpToStablehlo : public OpRewritePattern<enzymexla::TGammaOp> {
   }
 };
 
+struct LowerLGammaOpToStablehlo : public OpRewritePattern<enzymexla::LGammaOp> {
+  using OpRewritePattern<enzymexla::LGammaOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(enzymexla::LGammaOp op,
+                                PatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    auto operand = op.getOperand();
+    auto result = stablehlo::materializeLgamma(rewriter, loc, operand);
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 struct LowerGeluOpToStablehlo : public OpRewritePattern<enzymexla::GeluOp> {
   using OpRewritePattern<enzymexla::GeluOp>::OpRewritePattern;
 
@@ -230,6 +243,7 @@ struct LowerEnzymeXLAMLPass
     patterns.add<LowerGeluOpToStablehlo>(context);
     patterns.add<LowerSoftplusOpToStablehlo>(context);
     patterns.add<LowerTGammaOpToStablehlo>(context);
+    patterns.add<LowerLGammaOpToStablehlo>(context);
 
     GreedyRewriteConfig config;
     config.enableFolding();

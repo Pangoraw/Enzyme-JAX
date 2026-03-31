@@ -1210,6 +1210,20 @@ def TGammaOp: EnzymeXLA_Op<"ml.tgamma", [Pure, SameOperandsAndResultType, Elemen
   }];
 }
 
+def LGammaOp: EnzymeXLA_Op<"ml.lgamma", [Pure, SameOperandsAndResultType, Elementwise]> {
+  let summary = "Computes the log-gamma function";
+
+  let arguments = (ins
+    FloatLike:$input
+  );
+
+  let results = (outs FloatLike:$result);
+
+  let assemblyFormat = [{
+    $input attr-dict `:` functional-type($input, results)
+  }];
+}
+
 def SoftplusOp: EnzymeXLA_Op<"ml.softplus", [Pure, SameOperandsAndResultType, Elementwise]> {
   let summary = "Computes the Softplus activation function";
 
