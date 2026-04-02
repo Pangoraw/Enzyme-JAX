@@ -447,6 +447,14 @@ def ApplyConvertConvertIntPatterns : EnzymeHLOPatternOp<
     "convert_convert_int"> {
   let patterns = ["ConvertConvertInt"];
 }
+def ApplyConvertMulConvertPatterns : EnzymeHLOPatternOp<
+    "convert_mul_convert"> {
+  let patterns = ["ConvertMulConvert"];
+}
+def ApplyNegateReduceWindowSubPatterns : EnzymeHLOPatternOp<
+    "negate_reduce_window_sub"> {
+  let patterns = ["NegateReduceWindowSub"];
+}
 def ApplyConcatToPadPatterns : EnzymeHLOPatternOp<
     "concat_to_pad"> {
   let patterns = ["ConcatToPad"];
@@ -543,6 +551,11 @@ def ApplyAllFiniteIsNegInfPatterns : EnzymeHLOPatternOp<
 def ApplyConcatReshapeSlicePatterns : EnzymeHLOPatternOp<
     "concat_reshape_slice"> {
   let patterns = ["ConcatReshapeSlice"];
+}
+
+def ApplyConcatBroadcastSlicePatterns : EnzymeHLOPatternOp<
+    "concat_broadcast_slice"> {
+  let patterns = ["ConcatBroadcastSlice"];
 }
 
 def ApplyConcatReshapeReducePatterns : EnzymeHLOPatternOp<
@@ -1445,6 +1458,11 @@ def SelectCompIotaConstToDUS : EnzymeHLOPatternOp<
 def SelectPadToDUS : EnzymeHLOPatternOp<
     "select_pad_to_dus"> {
   let patterns = ["SelectPadToDUS"];
+}
+
+def SelectSelectSameCond : EnzymeHLOPatternOp<
+    "select_select_same_cond"> {
+  let patterns = ["SelectSelectSameCond"];
 }
 
 def AndPadPad : EnzymeHLOPatternOp<
