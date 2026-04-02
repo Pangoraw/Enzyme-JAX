@@ -74,7 +74,7 @@ jobs:
         run: |
           # Artifact names cannot include forward slashes and some other characters, here we
           # do some sanitisation.
-          ARTIFACT_INDEX=${{ matrix.os}}-${{ matrix.julia_version }}-${{ matrix.xla_commit }}-${{ matrix.gb25_commit }}-${{ matrix.reactant_commit }}-${{matrix.grid}}
+          ARTIFACT_INDEX="${{ matrix.os}}-${{ matrix.julia_version }}-${{ matrix.xla_commit }}-${{ matrix.gb25_commit }}-${{ matrix.reactant_commit }}-${{matrix.grid}}"
           # Replace forward slashes with underscores
           ARTIFACT_INDEX=${ARTIFACT_INDEX//\//_}
           # Remove all spaces
