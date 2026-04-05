@@ -10,152 +10,7 @@ func.func @sqrt(%arg0: tensor<3xf64>) -> tensor<3xf64> {
   return %0 : tensor<3xf64>
 }
 
-// TUPLE-LABEL: {{.*}}func.func @sqrt(
-// TUPLE:     %[[V_0:.*]] = stablehlo.convert %arg0 : (tensor<3xf64>) -> tensor<3xf32>
-// TUPLE:     %[[V_1:.*]] = stablehlo.convert %[[V_0]] : (tensor<3xf32>) -> tensor<3xf64>
-// TUPLE:     %[[V_2:.*]] = stablehlo.subtract %arg0, %[[V_1]] : tensor<3xf64>
-// TUPLE:     %[[V_3:.*]] = stablehlo.convert %[[V_2]] : (tensor<3xf64>) -> tensor<3xf32>
-// TUPLE:     %[[V_4:.*]] = stablehlo.tuple %[[V_0]], %[[V_3]] : tuple<tensor<3xf32>, tensor<3xf32>>
-// TUPLE:     %[[V_5:.*]] = stablehlo.get_tuple_element %[[V_4]][0] : (tuple<tensor<3xf32>, tensor<3xf32>>) -> tensor<3xf32>
-// TUPLE:     %[[V_6:.*]] = stablehlo.get_tuple_element %[[V_4]][1] : (tuple<tensor<3xf32>, tensor<3xf32>>) -> tensor<3xf32>
-// TUPLE:     %[[CST:.*]] = stablehlo.constant dense<0.000000e+00> : tensor<3xf32>
-// TUPLE:     %[[CST_0:.*]] = stablehlo.constant dense<1.000000e+00> : tensor<3xf32>
-// TUPLE:     %[[V_7:.*]] = stablehlo.compare EQ, %[[V_5]], %[[CST]] : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xi1>
-// TUPLE:     %[[V_8:.*]] = stablehlo.select %[[V_7]], %[[CST_0]], %[[V_5]] : tensor<3xi1>, tensor<3xf32>
-// TUPLE:     %[[V_9:.*]] = stablehlo.rsqrt %[[V_8]] : tensor<3xf32>
-// TUPLE:     %[[V_10:.*]] = stablehlo.multiply %[[V_5]], %[[V_9]] : tensor<3xf32>
-// TUPLE:     %[[CST_1:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
-// TUPLE:     %[[V_11:.*]] = stablehlo.multiply %[[V_5]], %[[CST_1]] : tensor<3xf32>
-// TUPLE:     %[[V_12:.*]] = stablehlo.subtract %[[V_11]], %[[V_5]] : tensor<3xf32>
-// TUPLE:     %[[V_13:.*]] = stablehlo.subtract %[[V_11]], %[[V_12]] : tensor<3xf32>
-// TUPLE:     %[[V_14:.*]] = stablehlo.subtract %[[V_5]], %[[V_13]] : tensor<3xf32>
-// TUPLE:     %[[CST_2:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
-// TUPLE:     %[[V_15:.*]] = stablehlo.multiply %[[V_9]], %[[CST_2]] : tensor<3xf32>
-// TUPLE:     %[[V_16:.*]] = stablehlo.subtract %[[V_15]], %[[V_9]] : tensor<3xf32>
-// TUPLE:     %[[V_17:.*]] = stablehlo.subtract %[[V_15]], %[[V_16]] : tensor<3xf32>
-// TUPLE:     %[[V_18:.*]] = stablehlo.subtract %[[V_9]], %[[V_17]] : tensor<3xf32>
-// TUPLE:     %[[V_19:.*]] = stablehlo.multiply %[[V_13]], %[[V_17]] : tensor<3xf32>
-// TUPLE:     %[[V_20:.*]] = stablehlo.multiply %[[V_13]], %[[V_18]] : tensor<3xf32>
-// TUPLE:     %[[V_21:.*]] = stablehlo.multiply %[[V_14]], %[[V_17]] : tensor<3xf32>
-// TUPLE:     %[[V_22:.*]] = stablehlo.multiply %[[V_14]], %[[V_18]] : tensor<3xf32>
-// TUPLE:     %[[V_23:.*]] = stablehlo.subtract %[[V_19]], %[[V_10]] : tensor<3xf32>
-// TUPLE:     %[[V_24:.*]] = stablehlo.add %[[V_20]], %[[V_21]] : tensor<3xf32>
-// TUPLE:     %[[V_25:.*]] = stablehlo.add %[[V_23]], %[[V_24]] : tensor<3xf32>
-// TUPLE:     %[[V_26:.*]] = stablehlo.add %[[V_25]], %[[V_22]] : tensor<3xf32>
-// TUPLE:     %[[V_27:.*]] = stablehlo.multiply %[[V_5]], %[[CST]] : tensor<3xf32>
-// TUPLE:     %[[V_28:.*]] = stablehlo.multiply %[[V_6]], %[[V_9]] : tensor<3xf32>
-// TUPLE:     %[[V_29:.*]] = stablehlo.add %[[V_27]], %[[V_28]] : tensor<3xf32>
-// TUPLE:     %[[V_30:.*]] = stablehlo.add %[[V_26]], %[[V_29]] : tensor<3xf32>
-// TUPLE:     %[[V_31:.*]] = stablehlo.add %[[V_10]], %[[V_30]] : tensor<3xf32>
-// TUPLE:     %[[V_32:.*]] = stablehlo.subtract %[[V_31]], %[[V_10]] : tensor<3xf32>
-// TUPLE:     %[[V_33:.*]] = stablehlo.subtract %[[V_30]], %[[V_32]] : tensor<3xf32>
-// TUPLE:     %[[V_34:.*]] = stablehlo.multiply %[[V_31]], %[[V_31]] : tensor<3xf32>
-// TUPLE:     %[[CST_3:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
-// TUPLE:     %[[V_35:.*]] = stablehlo.multiply %[[V_31]], %[[CST_3]] : tensor<3xf32>
-// TUPLE:     %[[V_36:.*]] = stablehlo.subtract %[[V_35]], %[[V_31]] : tensor<3xf32>
-// TUPLE:     %[[V_37:.*]] = stablehlo.subtract %[[V_35]], %[[V_36]] : tensor<3xf32>
-// TUPLE:     %[[V_38:.*]] = stablehlo.subtract %[[V_31]], %[[V_37]] : tensor<3xf32>
-// TUPLE:     %[[CST_4:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
-// TUPLE:     %[[V_39:.*]] = stablehlo.multiply %[[V_31]], %[[CST_4]] : tensor<3xf32>
-// TUPLE:     %[[V_40:.*]] = stablehlo.subtract %[[V_39]], %[[V_31]] : tensor<3xf32>
-// TUPLE:     %[[V_41:.*]] = stablehlo.subtract %[[V_39]], %[[V_40]] : tensor<3xf32>
-// TUPLE:     %[[V_42:.*]] = stablehlo.subtract %[[V_31]], %[[V_41]] : tensor<3xf32>
-// TUPLE:     %[[V_43:.*]] = stablehlo.multiply %[[V_37]], %[[V_41]] : tensor<3xf32>
-// TUPLE:     %[[V_44:.*]] = stablehlo.multiply %[[V_37]], %[[V_42]] : tensor<3xf32>
-// TUPLE:     %[[V_45:.*]] = stablehlo.multiply %[[V_38]], %[[V_41]] : tensor<3xf32>
-// TUPLE:     %[[V_46:.*]] = stablehlo.multiply %[[V_38]], %[[V_42]] : tensor<3xf32>
-// TUPLE:     %[[V_47:.*]] = stablehlo.subtract %[[V_43]], %[[V_34]] : tensor<3xf32>
-// TUPLE:     %[[V_48:.*]] = stablehlo.add %[[V_44]], %[[V_45]] : tensor<3xf32>
-// TUPLE:     %[[V_49:.*]] = stablehlo.add %[[V_47]], %[[V_48]] : tensor<3xf32>
-// TUPLE:     %[[V_50:.*]] = stablehlo.add %[[V_49]], %[[V_46]] : tensor<3xf32>
-// TUPLE:     %[[V_51:.*]] = stablehlo.multiply %[[V_31]], %[[V_33]] : tensor<3xf32>
-// TUPLE:     %[[V_52:.*]] = stablehlo.multiply %[[V_33]], %[[V_31]] : tensor<3xf32>
-// TUPLE:     %[[V_53:.*]] = stablehlo.add %[[V_51]], %[[V_52]] : tensor<3xf32>
-// TUPLE:     %[[V_54:.*]] = stablehlo.add %[[V_50]], %[[V_53]] : tensor<3xf32>
-// TUPLE:     %[[V_55:.*]] = stablehlo.add %[[V_34]], %[[V_54]] : tensor<3xf32>
-// TUPLE:     %[[V_56:.*]] = stablehlo.subtract %[[V_55]], %[[V_34]] : tensor<3xf32>
-// TUPLE:     %[[V_57:.*]] = stablehlo.subtract %[[V_54]], %[[V_56]] : tensor<3xf32>
-// TUPLE:     %[[V_58:.*]] = stablehlo.negate %[[V_5]] : tensor<3xf32>
-// TUPLE:     %[[V_59:.*]] = stablehlo.negate %[[V_6]] : tensor<3xf32>
-// TUPLE:     %[[V_60:.*]] = stablehlo.add %[[V_55]], %[[V_58]] : tensor<3xf32>
-// TUPLE:     %[[V_61:.*]] = stablehlo.subtract %[[V_60]], %[[V_58]] : tensor<3xf32>
-// TUPLE:     %[[V_62:.*]] = stablehlo.subtract %[[V_60]], %[[V_61]] : tensor<3xf32>
-// TUPLE:     %[[V_63:.*]] = stablehlo.subtract %[[V_55]], %[[V_61]] : tensor<3xf32>
-// TUPLE:     %[[V_64:.*]] = stablehlo.subtract %[[V_58]], %[[V_62]] : tensor<3xf32>
-// TUPLE:     %[[V_65:.*]] = stablehlo.add %[[V_63]], %[[V_64]] : tensor<3xf32>
-// TUPLE:     %[[V_66:.*]] = stablehlo.add %[[V_57]], %[[V_59]] : tensor<3xf32>
-// TUPLE:     %[[V_67:.*]] = stablehlo.subtract %[[V_66]], %[[V_59]] : tensor<3xf32>
-// TUPLE:     %[[V_68:.*]] = stablehlo.subtract %[[V_66]], %[[V_67]] : tensor<3xf32>
-// TUPLE:     %[[V_69:.*]] = stablehlo.subtract %[[V_57]], %[[V_67]] : tensor<3xf32>
-// TUPLE:     %[[V_70:.*]] = stablehlo.subtract %[[V_59]], %[[V_68]] : tensor<3xf32>
-// TUPLE:     %[[V_71:.*]] = stablehlo.add %[[V_69]], %[[V_70]] : tensor<3xf32>
-// TUPLE:     %[[V_72:.*]] = stablehlo.add %[[V_60]], %[[V_66]] : tensor<3xf32>
-// TUPLE:     %[[V_73:.*]] = stablehlo.subtract %[[V_72]], %[[V_60]] : tensor<3xf32>
-// TUPLE:     %[[V_74:.*]] = stablehlo.subtract %[[V_66]], %[[V_73]] : tensor<3xf32>
-// TUPLE:     %[[V_75:.*]] = stablehlo.add %[[V_65]], %[[V_71]] : tensor<3xf32>
-// TUPLE:     %[[V_76:.*]] = stablehlo.add %[[V_75]], %[[V_74]] : tensor<3xf32>
-// TUPLE:     %[[V_77:.*]] = stablehlo.add %[[V_72]], %[[V_76]] : tensor<3xf32>
-// TUPLE:     %[[V_78:.*]] = stablehlo.subtract %[[V_77]], %[[V_72]] : tensor<3xf32>
-// TUPLE:     %[[V_79:.*]] = stablehlo.subtract %[[V_76]], %[[V_78]] : tensor<3xf32>
-// TUPLE:     %[[CST_5:.*]] = stablehlo.constant dense<5.000000e-01> : tensor<3xf32>
-// TUPLE:     %[[V_80:.*]] = stablehlo.multiply %[[CST_5]], %[[V_9]] : tensor<3xf32>
-// TUPLE:     %[[V_81:.*]] = stablehlo.multiply %[[V_77]], %[[V_80]] : tensor<3xf32>
-// TUPLE:     %[[CST_6:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
-// TUPLE:     %[[V_82:.*]] = stablehlo.multiply %[[V_77]], %[[CST_6]] : tensor<3xf32>
-// TUPLE:     %[[V_83:.*]] = stablehlo.subtract %[[V_82]], %[[V_77]] : tensor<3xf32>
-// TUPLE:     %[[V_84:.*]] = stablehlo.subtract %[[V_82]], %[[V_83]] : tensor<3xf32>
-// TUPLE:     %[[V_85:.*]] = stablehlo.subtract %[[V_77]], %[[V_84]] : tensor<3xf32>
-// TUPLE:     %[[CST_7:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
-// TUPLE:     %[[V_86:.*]] = stablehlo.multiply %[[V_80]], %[[CST_7]] : tensor<3xf32>
-// TUPLE:     %[[V_87:.*]] = stablehlo.subtract %[[V_86]], %[[V_80]] : tensor<3xf32>
-// TUPLE:     %[[V_88:.*]] = stablehlo.subtract %[[V_86]], %[[V_87]] : tensor<3xf32>
-// TUPLE:     %[[V_89:.*]] = stablehlo.subtract %[[V_80]], %[[V_88]] : tensor<3xf32>
-// TUPLE:     %[[V_90:.*]] = stablehlo.multiply %[[V_84]], %[[V_88]] : tensor<3xf32>
-// TUPLE:     %[[V_91:.*]] = stablehlo.multiply %[[V_84]], %[[V_89]] : tensor<3xf32>
-// TUPLE:     %[[V_92:.*]] = stablehlo.multiply %[[V_85]], %[[V_88]] : tensor<3xf32>
-// TUPLE:     %[[V_93:.*]] = stablehlo.multiply %[[V_85]], %[[V_89]] : tensor<3xf32>
-// TUPLE:     %[[V_94:.*]] = stablehlo.subtract %[[V_90]], %[[V_81]] : tensor<3xf32>
-// TUPLE:     %[[V_95:.*]] = stablehlo.add %[[V_91]], %[[V_92]] : tensor<3xf32>
-// TUPLE:     %[[V_96:.*]] = stablehlo.add %[[V_94]], %[[V_95]] : tensor<3xf32>
-// TUPLE:     %[[V_97:.*]] = stablehlo.add %[[V_96]], %[[V_93]] : tensor<3xf32>
-// TUPLE:     %[[V_98:.*]] = stablehlo.multiply %[[V_77]], %[[CST]] : tensor<3xf32>
-// TUPLE:     %[[V_99:.*]] = stablehlo.multiply %[[V_79]], %[[V_80]] : tensor<3xf32>
-// TUPLE:     %[[V_100:.*]] = stablehlo.add %[[V_98]], %[[V_99]] : tensor<3xf32>
-// TUPLE:     %[[V_101:.*]] = stablehlo.add %[[V_97]], %[[V_100]] : tensor<3xf32>
-// TUPLE:     %[[V_102:.*]] = stablehlo.add %[[V_81]], %[[V_101]] : tensor<3xf32>
-// TUPLE:     %[[V_103:.*]] = stablehlo.subtract %[[V_102]], %[[V_81]] : tensor<3xf32>
-// TUPLE:     %[[V_104:.*]] = stablehlo.subtract %[[V_101]], %[[V_103]] : tensor<3xf32>
-// TUPLE:     %[[V_105:.*]] = stablehlo.negate %[[V_102]] : tensor<3xf32>
-// TUPLE:     %[[V_106:.*]] = stablehlo.negate %[[V_104]] : tensor<3xf32>
-// TUPLE:     %[[V_107:.*]] = stablehlo.add %[[V_31]], %[[V_105]] : tensor<3xf32>
-// TUPLE:     %[[V_108:.*]] = stablehlo.subtract %[[V_107]], %[[V_105]] : tensor<3xf32>
-// TUPLE:     %[[V_109:.*]] = stablehlo.subtract %[[V_107]], %[[V_108]] : tensor<3xf32>
-// TUPLE:     %[[V_110:.*]] = stablehlo.subtract %[[V_31]], %[[V_108]] : tensor<3xf32>
-// TUPLE:     %[[V_111:.*]] = stablehlo.subtract %[[V_105]], %[[V_109]] : tensor<3xf32>
-// TUPLE:     %[[V_112:.*]] = stablehlo.add %[[V_110]], %[[V_111]] : tensor<3xf32>
-// TUPLE:     %[[V_113:.*]] = stablehlo.add %[[V_33]], %[[V_106]] : tensor<3xf32>
-// TUPLE:     %[[V_114:.*]] = stablehlo.subtract %[[V_113]], %[[V_106]] : tensor<3xf32>
-// TUPLE:     %[[V_115:.*]] = stablehlo.subtract %[[V_113]], %[[V_114]] : tensor<3xf32>
-// TUPLE:     %[[V_116:.*]] = stablehlo.subtract %[[V_33]], %[[V_114]] : tensor<3xf32>
-// TUPLE:     %[[V_117:.*]] = stablehlo.subtract %[[V_106]], %[[V_115]] : tensor<3xf32>
-// TUPLE:     %[[V_118:.*]] = stablehlo.add %[[V_116]], %[[V_117]] : tensor<3xf32>
-// TUPLE:     %[[V_119:.*]] = stablehlo.add %[[V_107]], %[[V_113]] : tensor<3xf32>
-// TUPLE:     %[[V_120:.*]] = stablehlo.subtract %[[V_119]], %[[V_107]] : tensor<3xf32>
-// TUPLE:     %[[V_121:.*]] = stablehlo.subtract %[[V_113]], %[[V_120]] : tensor<3xf32>
-// TUPLE:     %[[V_122:.*]] = stablehlo.add %[[V_112]], %[[V_118]] : tensor<3xf32>
-// TUPLE:     %[[V_123:.*]] = stablehlo.add %[[V_122]], %[[V_121]] : tensor<3xf32>
-// TUPLE:     %[[V_124:.*]] = stablehlo.add %[[V_119]], %[[V_123]] : tensor<3xf32>
-// TUPLE:     %[[V_125:.*]] = stablehlo.subtract %[[V_124]], %[[V_119]] : tensor<3xf32>
-// TUPLE:     %[[V_126:.*]] = stablehlo.subtract %[[V_123]], %[[V_125]] : tensor<3xf32>
-// TUPLE:     %[[V_127:.*]] = stablehlo.select %[[V_7]], %[[CST]], %[[V_124]] : tensor<3xi1>, tensor<3xf32>
-// TUPLE:     %[[V_128:.*]] = stablehlo.select %[[V_7]], %[[CST]], %[[V_126]] : tensor<3xi1>, tensor<3xf32>
-// TUPLE:     %[[V_129:.*]] = stablehlo.tuple %[[V_127]], %[[V_128]] : tuple<tensor<3xf32>, tensor<3xf32>>
-// TUPLE:     %[[V_130:.*]] = stablehlo.convert %[[V_127]] : (tensor<3xf32>) -> tensor<3xf64>
-// TUPLE:     %[[V_131:.*]] = stablehlo.convert %[[V_128]] : (tensor<3xf32>) -> tensor<3xf64>
-// TUPLE:     %[[V_132:.*]] = stablehlo.add %[[V_130]], %[[V_131]] : tensor<3xf64>
-// TUPLE:     return %[[V_132]] : tensor<3xf64>
-
-// FIRST-LABEL: {{.*}}func.func @sqrt(
+// FIRST-LABEL: func.func @sqrt
 // FIRST:     %[[V_0:.*]] = stablehlo.convert %arg0 : (tensor<3xf64>) -> tensor<3xf32>
 // FIRST:     %[[V_1:.*]] = stablehlo.convert %[[V_0]] : (tensor<3xf32>) -> tensor<3xf64>
 // FIRST:     %[[V_2:.*]] = stablehlo.subtract %arg0, %[[V_1]] : tensor<3xf64>
@@ -167,7 +22,7 @@ func.func @sqrt(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // FIRST:     %[[V_8:.*]] = stablehlo.slice %[[V_6]] [1:2, 0:3] : (tensor<2x3xf32>) -> tensor<1x3xf32>
 // FIRST:     %[[CST:.*]] = stablehlo.constant dense<0.000000e+00> : tensor<1x3xf32>
 // FIRST:     %[[CST_0:.*]] = stablehlo.constant dense<1.000000e+00> : tensor<1x3xf32>
-// FIRST:     %[[V_9:.*]] = stablehlo.compare EQ, %[[V_7]], %[[CST]] : (tensor<1x3xf32>, tensor<1x3xf32>) -> tensor<1x3xi1>
+// FIRST:     %[[V_9:.*]] = stablehlo.compare LE, %[[V_7]], %[[CST]] : (tensor<1x3xf32>, tensor<1x3xf32>) -> tensor<1x3xi1>
 // FIRST:     %[[V_10:.*]] = stablehlo.select %[[V_9]], %[[CST_0]], %[[V_7]] : tensor<1x3xi1>, tensor<1x3xf32>
 // FIRST:     %[[V_11:.*]] = stablehlo.rsqrt %[[V_10]] : tensor<1x3xf32>
 // FIRST:     %[[V_12:.*]] = stablehlo.multiply %[[V_7]], %[[V_11]] : tensor<1x3xf32>
@@ -303,7 +158,7 @@ func.func @sqrt(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // FIRST:     %[[V_133:.*]] = stablehlo.reduce(%[[V_132]] init: %[[CST_9]]) applies stablehlo.add across dimensions = [0] : (tensor<2x3xf64>, tensor<f64>) -> tensor<3xf64>
 // FIRST:     return %[[V_133]] : tensor<3xf64>
 
-// LAST-LABEL: {{.*}}func.func @sqrt(
+// LAST-LABEL: func.func @sqrt
 // LAST:     %[[V_0:.*]] = stablehlo.convert %arg0 : (tensor<3xf64>) -> tensor<3xf32>
 // LAST:     %[[V_1:.*]] = stablehlo.convert %[[V_0]] : (tensor<3xf32>) -> tensor<3xf64>
 // LAST:     %[[V_2:.*]] = stablehlo.subtract %arg0, %[[V_1]] : tensor<3xf64>
@@ -315,7 +170,7 @@ func.func @sqrt(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // LAST:     %[[V_8:.*]] = stablehlo.slice %[[V_6]] [0:3, 1:2] : (tensor<3x2xf32>) -> tensor<3x1xf32>
 // LAST:     %[[CST:.*]] = stablehlo.constant dense<0.000000e+00> : tensor<3x1xf32>
 // LAST:     %[[CST_0:.*]] = stablehlo.constant dense<1.000000e+00> : tensor<3x1xf32>
-// LAST:     %[[V_9:.*]] = stablehlo.compare EQ, %[[V_7]], %[[CST]] : (tensor<3x1xf32>, tensor<3x1xf32>) -> tensor<3x1xi1>
+// LAST:     %[[V_9:.*]] = stablehlo.compare LE, %[[V_7]], %[[CST]] : (tensor<3x1xf32>, tensor<3x1xf32>) -> tensor<3x1xi1>
 // LAST:     %[[V_10:.*]] = stablehlo.select %[[V_9]], %[[CST_0]], %[[V_7]] : tensor<3x1xi1>, tensor<3x1xf32>
 // LAST:     %[[V_11:.*]] = stablehlo.rsqrt %[[V_10]] : tensor<3x1xf32>
 // LAST:     %[[V_12:.*]] = stablehlo.multiply %[[V_7]], %[[V_11]] : tensor<3x1xf32>
@@ -451,11 +306,150 @@ func.func @sqrt(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // LAST:     %[[V_133:.*]] = stablehlo.reduce(%[[V_132]] init: %[[CST_9]]) applies stablehlo.add across dimensions = [1] : (tensor<3x2xf64>, tensor<f64>) -> tensor<3xf64>
 // LAST:     return %[[V_133]] : tensor<3xf64>
 
-// FIRST-LABEL: func.func @main
-
-// LAST-LABEL: func.func @main
-
-// TUPLE-LABEL: func.func @main
+// TUPLE-LABEL: func.func @sqrt
+// TUPLE:     %[[V_0:.*]] = stablehlo.convert %arg0 : (tensor<3xf64>) -> tensor<3xf32>
+// TUPLE:     %[[V_1:.*]] = stablehlo.convert %[[V_0]] : (tensor<3xf32>) -> tensor<3xf64>
+// TUPLE:     %[[V_2:.*]] = stablehlo.subtract %arg0, %[[V_1]] : tensor<3xf64>
+// TUPLE:     %[[V_3:.*]] = stablehlo.convert %[[V_2]] : (tensor<3xf64>) -> tensor<3xf32>
+// TUPLE:     %[[V_4:.*]] = stablehlo.tuple %[[V_0]], %[[V_3]] : tuple<tensor<3xf32>, tensor<3xf32>>
+// TUPLE:     %[[V_5:.*]] = stablehlo.get_tuple_element %[[V_4]][0] : (tuple<tensor<3xf32>, tensor<3xf32>>) -> tensor<3xf32>
+// TUPLE:     %[[V_6:.*]] = stablehlo.get_tuple_element %[[V_4]][1] : (tuple<tensor<3xf32>, tensor<3xf32>>) -> tensor<3xf32>
+// TUPLE:     %[[CST:.*]] = stablehlo.constant dense<0.000000e+00> : tensor<3xf32>
+// TUPLE:     %[[CST_0:.*]] = stablehlo.constant dense<1.000000e+00> : tensor<3xf32>
+// TUPLE:     %[[V_7:.*]] = stablehlo.compare LE, %[[V_5]], %[[CST]] : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xi1>
+// TUPLE:     %[[V_8:.*]] = stablehlo.select %[[V_7]], %[[CST_0]], %[[V_5]] : tensor<3xi1>, tensor<3xf32>
+// TUPLE:     %[[V_9:.*]] = stablehlo.rsqrt %[[V_8]] : tensor<3xf32>
+// TUPLE:     %[[V_10:.*]] = stablehlo.multiply %[[V_5]], %[[V_9]] : tensor<3xf32>
+// TUPLE:     %[[CST_1:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
+// TUPLE:     %[[V_11:.*]] = stablehlo.multiply %[[V_5]], %[[CST_1]] : tensor<3xf32>
+// TUPLE:     %[[V_12:.*]] = stablehlo.subtract %[[V_11]], %[[V_5]] : tensor<3xf32>
+// TUPLE:     %[[V_13:.*]] = stablehlo.subtract %[[V_11]], %[[V_12]] : tensor<3xf32>
+// TUPLE:     %[[V_14:.*]] = stablehlo.subtract %[[V_5]], %[[V_13]] : tensor<3xf32>
+// TUPLE:     %[[CST_2:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
+// TUPLE:     %[[V_15:.*]] = stablehlo.multiply %[[V_9]], %[[CST_2]] : tensor<3xf32>
+// TUPLE:     %[[V_16:.*]] = stablehlo.subtract %[[V_15]], %[[V_9]] : tensor<3xf32>
+// TUPLE:     %[[V_17:.*]] = stablehlo.subtract %[[V_15]], %[[V_16]] : tensor<3xf32>
+// TUPLE:     %[[V_18:.*]] = stablehlo.subtract %[[V_9]], %[[V_17]] : tensor<3xf32>
+// TUPLE:     %[[V_19:.*]] = stablehlo.multiply %[[V_13]], %[[V_17]] : tensor<3xf32>
+// TUPLE:     %[[V_20:.*]] = stablehlo.multiply %[[V_13]], %[[V_18]] : tensor<3xf32>
+// TUPLE:     %[[V_21:.*]] = stablehlo.multiply %[[V_14]], %[[V_17]] : tensor<3xf32>
+// TUPLE:     %[[V_22:.*]] = stablehlo.multiply %[[V_14]], %[[V_18]] : tensor<3xf32>
+// TUPLE:     %[[V_23:.*]] = stablehlo.subtract %[[V_19]], %[[V_10]] : tensor<3xf32>
+// TUPLE:     %[[V_24:.*]] = stablehlo.add %[[V_20]], %[[V_21]] : tensor<3xf32>
+// TUPLE:     %[[V_25:.*]] = stablehlo.add %[[V_23]], %[[V_24]] : tensor<3xf32>
+// TUPLE:     %[[V_26:.*]] = stablehlo.add %[[V_25]], %[[V_22]] : tensor<3xf32>
+// TUPLE:     %[[V_27:.*]] = stablehlo.multiply %[[V_5]], %[[CST]] : tensor<3xf32>
+// TUPLE:     %[[V_28:.*]] = stablehlo.multiply %[[V_6]], %[[V_9]] : tensor<3xf32>
+// TUPLE:     %[[V_29:.*]] = stablehlo.add %[[V_27]], %[[V_28]] : tensor<3xf32>
+// TUPLE:     %[[V_30:.*]] = stablehlo.add %[[V_26]], %[[V_29]] : tensor<3xf32>
+// TUPLE:     %[[V_31:.*]] = stablehlo.add %[[V_10]], %[[V_30]] : tensor<3xf32>
+// TUPLE:     %[[V_32:.*]] = stablehlo.subtract %[[V_31]], %[[V_10]] : tensor<3xf32>
+// TUPLE:     %[[V_33:.*]] = stablehlo.subtract %[[V_30]], %[[V_32]] : tensor<3xf32>
+// TUPLE:     %[[V_34:.*]] = stablehlo.multiply %[[V_31]], %[[V_31]] : tensor<3xf32>
+// TUPLE:     %[[CST_3:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
+// TUPLE:     %[[V_35:.*]] = stablehlo.multiply %[[V_31]], %[[CST_3]] : tensor<3xf32>
+// TUPLE:     %[[V_36:.*]] = stablehlo.subtract %[[V_35]], %[[V_31]] : tensor<3xf32>
+// TUPLE:     %[[V_37:.*]] = stablehlo.subtract %[[V_35]], %[[V_36]] : tensor<3xf32>
+// TUPLE:     %[[V_38:.*]] = stablehlo.subtract %[[V_31]], %[[V_37]] : tensor<3xf32>
+// TUPLE:     %[[CST_4:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
+// TUPLE:     %[[V_39:.*]] = stablehlo.multiply %[[V_31]], %[[CST_4]] : tensor<3xf32>
+// TUPLE:     %[[V_40:.*]] = stablehlo.subtract %[[V_39]], %[[V_31]] : tensor<3xf32>
+// TUPLE:     %[[V_41:.*]] = stablehlo.subtract %[[V_39]], %[[V_40]] : tensor<3xf32>
+// TUPLE:     %[[V_42:.*]] = stablehlo.subtract %[[V_31]], %[[V_41]] : tensor<3xf32>
+// TUPLE:     %[[V_43:.*]] = stablehlo.multiply %[[V_37]], %[[V_41]] : tensor<3xf32>
+// TUPLE:     %[[V_44:.*]] = stablehlo.multiply %[[V_37]], %[[V_42]] : tensor<3xf32>
+// TUPLE:     %[[V_45:.*]] = stablehlo.multiply %[[V_38]], %[[V_41]] : tensor<3xf32>
+// TUPLE:     %[[V_46:.*]] = stablehlo.multiply %[[V_38]], %[[V_42]] : tensor<3xf32>
+// TUPLE:     %[[V_47:.*]] = stablehlo.subtract %[[V_43]], %[[V_34]] : tensor<3xf32>
+// TUPLE:     %[[V_48:.*]] = stablehlo.add %[[V_44]], %[[V_45]] : tensor<3xf32>
+// TUPLE:     %[[V_49:.*]] = stablehlo.add %[[V_47]], %[[V_48]] : tensor<3xf32>
+// TUPLE:     %[[V_50:.*]] = stablehlo.add %[[V_49]], %[[V_46]] : tensor<3xf32>
+// TUPLE:     %[[V_51:.*]] = stablehlo.multiply %[[V_31]], %[[V_33]] : tensor<3xf32>
+// TUPLE:     %[[V_52:.*]] = stablehlo.multiply %[[V_33]], %[[V_31]] : tensor<3xf32>
+// TUPLE:     %[[V_53:.*]] = stablehlo.add %[[V_51]], %[[V_52]] : tensor<3xf32>
+// TUPLE:     %[[V_54:.*]] = stablehlo.add %[[V_50]], %[[V_53]] : tensor<3xf32>
+// TUPLE:     %[[V_55:.*]] = stablehlo.add %[[V_34]], %[[V_54]] : tensor<3xf32>
+// TUPLE:     %[[V_56:.*]] = stablehlo.subtract %[[V_55]], %[[V_34]] : tensor<3xf32>
+// TUPLE:     %[[V_57:.*]] = stablehlo.subtract %[[V_54]], %[[V_56]] : tensor<3xf32>
+// TUPLE:     %[[V_58:.*]] = stablehlo.negate %[[V_5]] : tensor<3xf32>
+// TUPLE:     %[[V_59:.*]] = stablehlo.negate %[[V_6]] : tensor<3xf32>
+// TUPLE:     %[[V_60:.*]] = stablehlo.add %[[V_55]], %[[V_58]] : tensor<3xf32>
+// TUPLE:     %[[V_61:.*]] = stablehlo.subtract %[[V_60]], %[[V_58]] : tensor<3xf32>
+// TUPLE:     %[[V_62:.*]] = stablehlo.subtract %[[V_60]], %[[V_61]] : tensor<3xf32>
+// TUPLE:     %[[V_63:.*]] = stablehlo.subtract %[[V_55]], %[[V_61]] : tensor<3xf32>
+// TUPLE:     %[[V_64:.*]] = stablehlo.subtract %[[V_58]], %[[V_62]] : tensor<3xf32>
+// TUPLE:     %[[V_65:.*]] = stablehlo.add %[[V_63]], %[[V_64]] : tensor<3xf32>
+// TUPLE:     %[[V_66:.*]] = stablehlo.add %[[V_57]], %[[V_59]] : tensor<3xf32>
+// TUPLE:     %[[V_67:.*]] = stablehlo.subtract %[[V_66]], %[[V_59]] : tensor<3xf32>
+// TUPLE:     %[[V_68:.*]] = stablehlo.subtract %[[V_66]], %[[V_67]] : tensor<3xf32>
+// TUPLE:     %[[V_69:.*]] = stablehlo.subtract %[[V_57]], %[[V_67]] : tensor<3xf32>
+// TUPLE:     %[[V_70:.*]] = stablehlo.subtract %[[V_59]], %[[V_68]] : tensor<3xf32>
+// TUPLE:     %[[V_71:.*]] = stablehlo.add %[[V_69]], %[[V_70]] : tensor<3xf32>
+// TUPLE:     %[[V_72:.*]] = stablehlo.add %[[V_60]], %[[V_66]] : tensor<3xf32>
+// TUPLE:     %[[V_73:.*]] = stablehlo.subtract %[[V_72]], %[[V_60]] : tensor<3xf32>
+// TUPLE:     %[[V_74:.*]] = stablehlo.subtract %[[V_66]], %[[V_73]] : tensor<3xf32>
+// TUPLE:     %[[V_75:.*]] = stablehlo.add %[[V_65]], %[[V_71]] : tensor<3xf32>
+// TUPLE:     %[[V_76:.*]] = stablehlo.add %[[V_75]], %[[V_74]] : tensor<3xf32>
+// TUPLE:     %[[V_77:.*]] = stablehlo.add %[[V_72]], %[[V_76]] : tensor<3xf32>
+// TUPLE:     %[[V_78:.*]] = stablehlo.subtract %[[V_77]], %[[V_72]] : tensor<3xf32>
+// TUPLE:     %[[V_79:.*]] = stablehlo.subtract %[[V_76]], %[[V_78]] : tensor<3xf32>
+// TUPLE:     %[[CST_5:.*]] = stablehlo.constant dense<5.000000e-01> : tensor<3xf32>
+// TUPLE:     %[[V_80:.*]] = stablehlo.multiply %[[CST_5]], %[[V_9]] : tensor<3xf32>
+// TUPLE:     %[[V_81:.*]] = stablehlo.multiply %[[V_77]], %[[V_80]] : tensor<3xf32>
+// TUPLE:     %[[CST_6:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
+// TUPLE:     %[[V_82:.*]] = stablehlo.multiply %[[V_77]], %[[CST_6]] : tensor<3xf32>
+// TUPLE:     %[[V_83:.*]] = stablehlo.subtract %[[V_82]], %[[V_77]] : tensor<3xf32>
+// TUPLE:     %[[V_84:.*]] = stablehlo.subtract %[[V_82]], %[[V_83]] : tensor<3xf32>
+// TUPLE:     %[[V_85:.*]] = stablehlo.subtract %[[V_77]], %[[V_84]] : tensor<3xf32>
+// TUPLE:     %[[CST_7:.*]] = stablehlo.constant dense<4.097000e+03> : tensor<3xf32>
+// TUPLE:     %[[V_86:.*]] = stablehlo.multiply %[[V_80]], %[[CST_7]] : tensor<3xf32>
+// TUPLE:     %[[V_87:.*]] = stablehlo.subtract %[[V_86]], %[[V_80]] : tensor<3xf32>
+// TUPLE:     %[[V_88:.*]] = stablehlo.subtract %[[V_86]], %[[V_87]] : tensor<3xf32>
+// TUPLE:     %[[V_89:.*]] = stablehlo.subtract %[[V_80]], %[[V_88]] : tensor<3xf32>
+// TUPLE:     %[[V_90:.*]] = stablehlo.multiply %[[V_84]], %[[V_88]] : tensor<3xf32>
+// TUPLE:     %[[V_91:.*]] = stablehlo.multiply %[[V_84]], %[[V_89]] : tensor<3xf32>
+// TUPLE:     %[[V_92:.*]] = stablehlo.multiply %[[V_85]], %[[V_88]] : tensor<3xf32>
+// TUPLE:     %[[V_93:.*]] = stablehlo.multiply %[[V_85]], %[[V_89]] : tensor<3xf32>
+// TUPLE:     %[[V_94:.*]] = stablehlo.subtract %[[V_90]], %[[V_81]] : tensor<3xf32>
+// TUPLE:     %[[V_95:.*]] = stablehlo.add %[[V_91]], %[[V_92]] : tensor<3xf32>
+// TUPLE:     %[[V_96:.*]] = stablehlo.add %[[V_94]], %[[V_95]] : tensor<3xf32>
+// TUPLE:     %[[V_97:.*]] = stablehlo.add %[[V_96]], %[[V_93]] : tensor<3xf32>
+// TUPLE:     %[[V_98:.*]] = stablehlo.multiply %[[V_77]], %[[CST]] : tensor<3xf32>
+// TUPLE:     %[[V_99:.*]] = stablehlo.multiply %[[V_79]], %[[V_80]] : tensor<3xf32>
+// TUPLE:     %[[V_100:.*]] = stablehlo.add %[[V_98]], %[[V_99]] : tensor<3xf32>
+// TUPLE:     %[[V_101:.*]] = stablehlo.add %[[V_97]], %[[V_100]] : tensor<3xf32>
+// TUPLE:     %[[V_102:.*]] = stablehlo.add %[[V_81]], %[[V_101]] : tensor<3xf32>
+// TUPLE:     %[[V_103:.*]] = stablehlo.subtract %[[V_102]], %[[V_81]] : tensor<3xf32>
+// TUPLE:     %[[V_104:.*]] = stablehlo.subtract %[[V_101]], %[[V_103]] : tensor<3xf32>
+// TUPLE:     %[[V_105:.*]] = stablehlo.negate %[[V_102]] : tensor<3xf32>
+// TUPLE:     %[[V_106:.*]] = stablehlo.negate %[[V_104]] : tensor<3xf32>
+// TUPLE:     %[[V_107:.*]] = stablehlo.add %[[V_31]], %[[V_105]] : tensor<3xf32>
+// TUPLE:     %[[V_108:.*]] = stablehlo.subtract %[[V_107]], %[[V_105]] : tensor<3xf32>
+// TUPLE:     %[[V_109:.*]] = stablehlo.subtract %[[V_107]], %[[V_108]] : tensor<3xf32>
+// TUPLE:     %[[V_110:.*]] = stablehlo.subtract %[[V_31]], %[[V_108]] : tensor<3xf32>
+// TUPLE:     %[[V_111:.*]] = stablehlo.subtract %[[V_105]], %[[V_109]] : tensor<3xf32>
+// TUPLE:     %[[V_112:.*]] = stablehlo.add %[[V_110]], %[[V_111]] : tensor<3xf32>
+// TUPLE:     %[[V_113:.*]] = stablehlo.add %[[V_33]], %[[V_106]] : tensor<3xf32>
+// TUPLE:     %[[V_114:.*]] = stablehlo.subtract %[[V_113]], %[[V_106]] : tensor<3xf32>
+// TUPLE:     %[[V_115:.*]] = stablehlo.subtract %[[V_113]], %[[V_114]] : tensor<3xf32>
+// TUPLE:     %[[V_116:.*]] = stablehlo.subtract %[[V_33]], %[[V_114]] : tensor<3xf32>
+// TUPLE:     %[[V_117:.*]] = stablehlo.subtract %[[V_106]], %[[V_115]] : tensor<3xf32>
+// TUPLE:     %[[V_118:.*]] = stablehlo.add %[[V_116]], %[[V_117]] : tensor<3xf32>
+// TUPLE:     %[[V_119:.*]] = stablehlo.add %[[V_107]], %[[V_113]] : tensor<3xf32>
+// TUPLE:     %[[V_120:.*]] = stablehlo.subtract %[[V_119]], %[[V_107]] : tensor<3xf32>
+// TUPLE:     %[[V_121:.*]] = stablehlo.subtract %[[V_113]], %[[V_120]] : tensor<3xf32>
+// TUPLE:     %[[V_122:.*]] = stablehlo.add %[[V_112]], %[[V_118]] : tensor<3xf32>
+// TUPLE:     %[[V_123:.*]] = stablehlo.add %[[V_122]], %[[V_121]] : tensor<3xf32>
+// TUPLE:     %[[V_124:.*]] = stablehlo.add %[[V_119]], %[[V_123]] : tensor<3xf32>
+// TUPLE:     %[[V_125:.*]] = stablehlo.subtract %[[V_124]], %[[V_119]] : tensor<3xf32>
+// TUPLE:     %[[V_126:.*]] = stablehlo.subtract %[[V_123]], %[[V_125]] : tensor<3xf32>
+// TUPLE:     %[[V_127:.*]] = stablehlo.select %[[V_7]], %[[CST]], %[[V_124]] : tensor<3xi1>, tensor<3xf32>
+// TUPLE:     %[[V_128:.*]] = stablehlo.select %[[V_7]], %[[CST]], %[[V_126]] : tensor<3xi1>, tensor<3xf32>
+// TUPLE:     %[[V_129:.*]] = stablehlo.tuple %[[V_127]], %[[V_128]] : tuple<tensor<3xf32>, tensor<3xf32>>
+// TUPLE:     %[[V_130:.*]] = stablehlo.convert %[[V_127]] : (tensor<3xf32>) -> tensor<3xf64>
+// TUPLE:     %[[V_131:.*]] = stablehlo.convert %[[V_128]] : (tensor<3xf32>) -> tensor<3xf64>
+// TUPLE:     %[[V_132:.*]] = stablehlo.add %[[V_130]], %[[V_131]] : tensor<3xf64>
+// TUPLE:     return %[[V_132]] : tensor<3xf64>
 
 func.func @main() attributes {enzyme.no_multifloat} {
   %cst = stablehlo.constant dense<[2.0, 0.0, 1.1]> : tensor<3xf64>
@@ -472,6 +466,8 @@ func.func @main() attributes {enzyme.no_multifloat} {
   "check.expect_close"(%res, %expected_f64) {max_ulp_difference = 10 : ui64} : (tensor<3xf64>, tensor<3xf64>) -> ()
   return
 }
+
+// FIRST-LABEL: func.func @main
 // FIRST:     %[[CST:.*]] = stablehlo.constant dense<{{[^>]*}}> : tensor<3xf64>
 // FIRST:     %[[CST_0:.*]] = stablehlo.constant dense<{{[^>]*}}> : tensor<3xf64>
 // FIRST:     %[[V_0:.*]] = call @sqrt(%[[CST]]) : (tensor<3xf64>) -> tensor<3xf64>

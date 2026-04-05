@@ -704,11 +704,12 @@ struct SubOpConversion : public OpConversionPattern<stablehlo::SubtractOp> {
 
 struct DivOpConversion : public OpConversionPattern<stablehlo::DivOp> {
   DivOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                  StringRef concatDimension)
+                  StringRef concatDimension, int divSubsteps)
       : OpConversionPattern<stablehlo::DivOp>(typeConverter, context),
-        concatDimension(concatDimension) {}
+        concatDimension(concatDimension), divSubsteps(divSubsteps) {}
 
   StringRef concatDimension;
+  int divSubsteps;
 
   LogicalResult
   matchAndRewrite(stablehlo::DivOp op, OpAdaptor adaptor,
@@ -724,42 +725,87 @@ struct DivOpConversion : public OpConversionPattern<stablehlo::DivOp> {
     Value y2 = extractLimb(adaptor.getOperands()[1], 1, rewriter, loc,
                            concatDimension);
 
-    auto tensorType = cast<RankedTensorType>(x1.getType());
-    auto floatTy = cast<FloatType>(tensorType.getElementType());
+    if (divSubsteps == 0) {
+      // 1. q_hi = x_hi / y_hi
+      Value q_hi = rewriter.create<stablehlo::DivOp>(loc, x1, y1);
 
-    auto oneAttr = rewriter.getFloatAttr(floatTy, 1.0);
-    Value one = rewriter.create<stablehlo::ConstantOp>(
-        loc, SplatElementsAttr::get(tensorType, oneAttr));
+      // 2. (p, e) = twoProdDekker(q_hi, y_hi)
+      auto [p, e] = twoProdDekker(q_hi, y1, rewriter, loc);
 
-    // u = 1 / y1
-    Value u = rewriter.create<stablehlo::DivOp>(loc, one, y1);
+      // 3. rem = x_hi - p - e + x_lo - q_hi * y_lo
+      Value neg_p = rewriter.create<stablehlo::NegOp>(loc, p);
+      Value neg_e = rewriter.create<stablehlo::NegOp>(loc, e);
 
-    auto zeroAttr = rewriter.getFloatAttr(floatTy, 0.0);
-    Value zero = rewriter.create<stablehlo::ConstantOp>(
-        loc, SplatElementsAttr::get(tensorType, zeroAttr));
+      // x_hi - p
+      Value rem1 = rewriter.create<stablehlo::AddOp>(loc, x1, neg_p);
+      // (x_hi - p) - e
+      Value rem2 = rewriter.create<stablehlo::AddOp>(loc, rem1, neg_e);
+      // ((x_hi - p) - e) + x_lo
+      Value rem3 = rewriter.create<stablehlo::AddOp>(loc, rem2, x2);
 
-    // quotient = X * u
-    auto [q_hi, q_lo] = multiFloatMul(x1, x2, u, zero, rewriter, loc);
+      // q_hi * y_lo
+      Value q_hi_y_lo = rewriter.create<stablehlo::MulOp>(loc, q_hi, y2);
+      Value neg_q_hi_y_lo = rewriter.create<stablehlo::NegOp>(loc, q_hi_y_lo);
 
-    // residual = quotient * Y - X
-    auto [q_Y_hi, q_Y_lo] = multiFloatMul(q_hi, q_lo, y1, y2, rewriter, loc);
-    Value neg_x1 = rewriter.create<stablehlo::NegOp>(loc, x1);
-    Value neg_x2 = rewriter.create<stablehlo::NegOp>(loc, x2);
-    auto [res_hi, res_lo] =
-        multiFloatAdd(q_Y_hi, q_Y_lo, neg_x1, neg_x2, rewriter, loc);
+      // rem = rem3 - q_hi * y_lo
+      Value rem = rewriter.create<stablehlo::AddOp>(loc, rem3, neg_q_hi_y_lo);
 
-    // correction = residual * u
-    auto [corr_hi, corr_lo] =
-        multiFloatMul(res_hi, res_lo, u, zero, rewriter, loc);
+      // 4. q_lo = rem / y_hi
+      Value q_lo = rewriter.create<stablehlo::DivOp>(loc, rem, y1);
 
-    // result = quotient - correction
-    Value neg_corr_hi = rewriter.create<stablehlo::NegOp>(loc, corr_hi);
-    Value neg_corr_lo = rewriter.create<stablehlo::NegOp>(loc, corr_lo);
-    auto [final_h, final_l] =
-        multiFloatAdd(q_hi, q_lo, neg_corr_hi, neg_corr_lo, rewriter, loc);
+      // 5. Combine q_hi and q_lo into a normalized MultiFloat (fast_two_sum)
+      Value final_h = rewriter.create<stablehlo::AddOp>(loc, q_hi, q_lo);
+      Value h_diff = rewriter.create<stablehlo::SubtractOp>(loc, final_h, q_hi);
+      Value q_lo_diff =
+          rewriter.create<stablehlo::SubtractOp>(loc, q_lo, h_diff);
+      Value final_l = q_lo_diff;
 
-    Value packed = packLimbs(final_h, final_l, rewriter, loc, concatDimension);
-    rewriter.replaceOp(op, packed);
+      Value packed =
+          packLimbs(final_h, final_l, rewriter, loc, concatDimension);
+      rewriter.replaceOp(op, packed);
+    } else {
+      auto tensorType = cast<RankedTensorType>(x1.getType());
+      auto floatTy = cast<FloatType>(tensorType.getElementType());
+
+      auto oneAttr = rewriter.getFloatAttr(floatTy, 1.0);
+      Value one = rewriter.create<stablehlo::ConstantOp>(
+          loc, SplatElementsAttr::get(tensorType, oneAttr));
+
+      auto zeroAttr = rewriter.getFloatAttr(floatTy, 0.0);
+      Value zero = rewriter.create<stablehlo::ConstantOp>(
+          loc, SplatElementsAttr::get(tensorType, zeroAttr));
+
+      auto twoAttr = rewriter.getFloatAttr(floatTy, 2.0);
+      Value two_hi = rewriter.create<stablehlo::ConstantOp>(
+          loc, SplatElementsAttr::get(tensorType, twoAttr));
+      Value two_lo = zero;
+
+      // u0 = 1 / y1
+      Value u_hi = rewriter.create<stablehlo::DivOp>(loc, one, y1);
+      Value u_lo = zero;
+
+      for (int i = 0; i < divSubsteps; ++i) {
+        // Y * u
+        auto [Y_u_hi, Y_u_lo] =
+            multiFloatMul(y1, y2, u_hi, u_lo, rewriter, loc);
+        // 2 - Y * u
+        Value neg_Y_u_hi = rewriter.create<stablehlo::NegOp>(loc, Y_u_hi);
+        Value neg_Y_u_lo = rewriter.create<stablehlo::NegOp>(loc, Y_u_lo);
+        auto [diff_hi, diff_lo] = multiFloatAdd(two_hi, two_lo, neg_Y_u_hi,
+                                                neg_Y_u_lo, rewriter, loc);
+        // u = u * (2 - Y * u)
+        auto [next_u_hi, next_u_lo] =
+            multiFloatMul(u_hi, u_lo, diff_hi, diff_lo, rewriter, loc);
+        u_hi = next_u_hi;
+        u_lo = next_u_lo;
+      }
+
+      // quotient = X * u
+      auto [q_hi, q_lo] = multiFloatMul(x1, x2, u_hi, u_lo, rewriter, loc);
+
+      Value packed = packLimbs(q_hi, q_lo, rewriter, loc, concatDimension);
+      rewriter.replaceOp(op, packed);
+    }
 
     return success();
   }
@@ -1472,12 +1518,13 @@ struct SqrtOpConversion : public OpConversionPattern<stablehlo::SqrtOp> {
     Value one = rewriter.create<stablehlo::ConstantOp>(
         loc, SplatElementsAttr::get(tensorType, oneAttr));
 
-    Value is_zero = rewriter.create<stablehlo::CompareOp>(
-        loc, x_hi, zero, stablehlo::ComparisonDirection::EQ);
+    // Ensure input is positive to avoid NaN in rsqrt
+    Value is_le_zero = rewriter.create<stablehlo::CompareOp>(
+        loc, x_hi, zero, stablehlo::ComparisonDirection::LE);
 
-    // x_hi_safe = is_zero ? 1.0 : x_hi
+    // x_hi_safe = is_le_zero ? 1.0 : x_hi
     Value x_hi_safe =
-        rewriter.create<stablehlo::SelectOp>(loc, is_zero, one, x_hi);
+        rewriter.create<stablehlo::SelectOp>(loc, is_le_zero, one, x_hi);
 
     // u0 = rsqrt(x_hi_safe)
     Value u0 = rewriter.create<stablehlo::RsqrtOp>(loc, x_hi_safe);
@@ -1513,11 +1560,11 @@ struct SqrtOpConversion : public OpConversionPattern<stablehlo::SqrtOp> {
     bool isTuple = concatDimension == "tuple";
 
     if (isTuple) {
-      // If is_zero, result is zero
+      // If is_le_zero, result is zero
       Value res_h =
-          rewriter.create<stablehlo::SelectOp>(loc, is_zero, zero, final_h);
+          rewriter.create<stablehlo::SelectOp>(loc, is_le_zero, zero, final_h);
       Value res_l =
-          rewriter.create<stablehlo::SelectOp>(loc, is_zero, zero, final_l);
+          rewriter.create<stablehlo::SelectOp>(loc, is_le_zero, zero, final_l);
 
       Value packed = packLimbs(res_h, res_l, rewriter, loc, concatDimension);
       rewriter.replaceOp(op, packed);
@@ -1533,9 +1580,10 @@ struct SqrtOpConversion : public OpConversionPattern<stablehlo::SqrtOp> {
         broadcastDims.push_back(i);
       }
 
-      // Broadcast is_zero
+      // Broadcast is_le_zero
       Value bcast_is_zero = rewriter.create<stablehlo::BroadcastInDimOp>(
-          loc, predType, is_zero, rewriter.getDenseI64ArrayAttr(broadcastDims));
+          loc, predType, is_le_zero,
+          rewriter.getDenseI64ArrayAttr(broadcastDims));
 
       // Create a full zero tensor of the same shape
       auto floatTy = cast<FloatType>(fullType.getElementType());
@@ -3505,7 +3553,8 @@ struct MultiFloatConversionPass
                                     concatDimension);
       patterns.add<SubOpConversion>(typeConverter, context, concatDimension);
       patterns.add<MulOpConversion>(typeConverter, context, concatDimension);
-      patterns.add<DivOpConversion>(typeConverter, context, concatDimension);
+      patterns.add<DivOpConversion>(typeConverter, context, concatDimension,
+                                    divSubsteps);
       patterns.add<SelectOpConversion>(typeConverter, context, concatDimension);
       patterns.add<ReverseOpConversion>(typeConverter, context,
                                         concatDimension);
