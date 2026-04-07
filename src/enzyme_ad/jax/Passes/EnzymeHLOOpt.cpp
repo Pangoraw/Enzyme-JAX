@@ -6292,16 +6292,27 @@ struct TGammaConstProp final
       return failure();
 
     const auto &sem = floatTy.getFloatSemantics();
-    SmallVector<APFloat> results;
-    for (auto val : inputAttr.getValues<APFloat>()) {
+
+    auto computeTGamma = [&](APFloat val) -> APFloat {
       double x = val.convertToDouble();
       double res =
           (x < 0.0) ? std::numeric_limits<double>::quiet_NaN() : std::tgamma(x);
       bool losesInfo;
       APFloat apRes(res);
       apRes.convert(sem, APFloat::rmNearestTiesToEven, &losesInfo);
-      results.push_back(apRes);
+      return apRes;
+    };
+
+    if (inputAttr.isSplat()) {
+      APFloat result = computeTGamma(inputAttr.getSplatValue<APFloat>());
+      rewriter.replaceOpWithNewOp<stablehlo::ConstantOp>(
+          op, DenseElementsAttr::get(resultType, result));
+      return success();
     }
+
+    SmallVector<APFloat> results;
+    for (auto val : inputAttr.getValues<APFloat>())
+      results.push_back(computeTGamma(val));
 
     rewriter.replaceOpWithNewOp<stablehlo::ConstantOp>(
         op, DenseElementsAttr::get(resultType, results));
@@ -6325,15 +6336,26 @@ struct LGammaConstProp final
       return failure();
 
     const auto &sem = floatTy.getFloatSemantics();
-    SmallVector<APFloat> results;
-    for (auto val : inputAttr.getValues<APFloat>()) {
+
+    auto computeLGamma = [&](APFloat val) -> APFloat {
       double x = val.convertToDouble();
       double res = std::lgamma(x);
       bool losesInfo;
       APFloat apRes(res);
       apRes.convert(sem, APFloat::rmNearestTiesToEven, &losesInfo);
-      results.push_back(apRes);
+      return apRes;
+    };
+
+    if (inputAttr.isSplat()) {
+      APFloat result = computeLGamma(inputAttr.getSplatValue<APFloat>());
+      rewriter.replaceOpWithNewOp<stablehlo::ConstantOp>(
+          op, DenseElementsAttr::get(resultType, result));
+      return success();
     }
+
+    SmallVector<APFloat> results;
+    for (auto val : inputAttr.getValues<APFloat>())
+      results.push_back(computeLGamma(val));
 
     rewriter.replaceOpWithNewOp<stablehlo::ConstantOp>(
         op, DenseElementsAttr::get(resultType, results));
@@ -6357,15 +6379,26 @@ struct CHLOLGammaConstProp final
       return failure();
 
     const auto &sem = floatTy.getFloatSemantics();
-    SmallVector<APFloat> results;
-    for (auto val : inputAttr.getValues<APFloat>()) {
+
+    auto computeLGamma = [&](APFloat val) -> APFloat {
       double x = val.convertToDouble();
       double res = std::lgamma(x);
       bool losesInfo;
       APFloat apRes(res);
       apRes.convert(sem, APFloat::rmNearestTiesToEven, &losesInfo);
-      results.push_back(apRes);
+      return apRes;
+    };
+
+    if (inputAttr.isSplat()) {
+      APFloat result = computeLGamma(inputAttr.getSplatValue<APFloat>());
+      rewriter.replaceOpWithNewOp<stablehlo::ConstantOp>(
+          op, DenseElementsAttr::get(resultType, result));
+      return success();
     }
+
+    SmallVector<APFloat> results;
+    for (auto val : inputAttr.getValues<APFloat>())
+      results.push_back(computeLGamma(val));
 
     rewriter.replaceOpWithNewOp<stablehlo::ConstantOp>(
         op, DenseElementsAttr::get(resultType, results));
@@ -35486,9 +35519,9 @@ struct EnzymeHLOOptPass
         ConvertConcat, DynamicUpdateToConcat, SliceOfDynamicUpdate,
         SliceOfUpdateWithoutCorners, SliceElementwise, SliceReshapeElementwise,
         DynamicSliceElementwise, SlicePad, SliceReshapePad, ReshapeSliceReshape,
-        DotReshapeDot, ChloInfConstProp, GammaConstProp, TGammaConstProp,
-        LGammaConstProp, CHLOLGammaConstProp, ConcatFuse, ConcatToBroadcast,
-        PadPad, PadReshapePad, ConcatPushBinop<stablehlo::AddOp>,
+        DotReshapeDot, ChloInfConstProp, CHLOLGammaConstProp, GammaConstProp,
+        TGammaConstProp, LGammaConstProp, ConcatFuse, ConcatToBroadcast, PadPad,
+        PadReshapePad, ConcatPushBinop<stablehlo::AddOp>,
         ConcatPushBinop<stablehlo::MulOp>, ScatterToDynamicUpdateSlice,
         ReduceConcat, ConcatSlice, ConcatMultiPad, ConcatWrap, WidenWrap,
         WidenExtend, ConcatConcatAxisSwap, SliceConcat, SliceIf,
