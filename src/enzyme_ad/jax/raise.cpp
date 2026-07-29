@@ -131,9 +131,12 @@ extern "C" std::string runLLVMToMLIRRoundTrip(std::string input,
       if (outfile.size() && getenv("EXPORT_REACTANT")) {
         pass_pipeline += "print{filename="+outfile+".mlir},";
       }
-      pass_pipeline += "symbol-dce,outline-enzyme-regions,"
-        "enzyme,canonicalize,split-multi-results,remove-unnecessary-enzyme-ops,"
-        "flatten-enzyme-caches,enzyme-simplify-math,"
+      pass_pipeline += "symbol-dce,raise-llvm-ext,outline-enzyme-regions,"
+        "enzyme,lower-llvm-ext,canonicalize,split-multi-results,remove-unnecessary-enzyme-ops,"
+        // binomial checkpointing leaves enzyme.binomial_progress behind; it has
+        // no lowering of its own further down, so expand it here.
+        "flatten-enzyme-caches,lower-enzyme-binomial-progress,"
+        "enzyme-simplify-math,"
         // canonicalize here folds away memref.subview ops before gpu-kernel-outlining
         "canonicalize,cse,lower-affine";
       if (backend == "rocm")
@@ -178,15 +181,25 @@ extern "C" std::string runLLVMToMLIRRoundTrip(std::string input,
     exit(2);
   }
 
+  if (getenv("DEBUG_REACTANT_PRINT_OP_ON_DIAGNOSTIC"))
+    mod->getContext()->printOpOnDiagnostic(true);
+
   DiagnosticEngine &engine = mod->getContext()->getDiagEngine();
   error_stream << "Pipeline failed:\n";
   DiagnosticEngine::HandlerID id =
       engine.registerHandler([&](Diagnostic &diag) -> LogicalResult {
         error_stream << diag << "\n";
+        for (auto &note : diag.getNotes())
+          error_stream << "  note: " << note << "\n";
         return failure();
       });
   if (!mlir::succeeded(pm.run(cast<mlir::ModuleOp>(*mod)))) {
     llvm::errs() << error_stream.str() << "\n";
+    if (auto path = getenv("DEBUG_REACTANT_DUMP_ON_FAILURE")) {
+      std::error_code EC;
+      llvm::raw_fd_ostream os(path, EC);
+      mod->print(os, flags);
+    }
     return "";
   }
 
