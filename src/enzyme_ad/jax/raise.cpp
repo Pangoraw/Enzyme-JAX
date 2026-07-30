@@ -132,6 +132,10 @@ extern "C" std::string runLLVMToMLIRRoundTrip(std::string input,
         pass_pipeline += "print{filename="+outfile+".mlir},";
       }
       pass_pipeline += "symbol-dce,raise-llvm-ext,outline-enzyme-regions,"
+        // A checkpointed loop must not capture both a value and a view of it:
+        // it would snapshot the same buffer twice. Has to precede `enzyme`,
+        // which is what reads the captures.
+        "sink-checkpoint-views,"
         "enzyme,lower-llvm-ext,canonicalize,split-multi-results,remove-unnecessary-enzyme-ops,"
         // binomial checkpointing leaves enzyme.binomial_progress behind; it has
         // no lowering of its own further down, so expand it here.
