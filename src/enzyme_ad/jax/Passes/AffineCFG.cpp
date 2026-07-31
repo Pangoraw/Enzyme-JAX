@@ -100,14 +100,12 @@ bool isValidSymbolInt(Operation *defOp, bool recur, Region *scope) {
     }
     if (auto ifOp = dyn_cast<scf::IfOp>(defOp)) {
       if (isValidSymbolInt(ifOp.getCondition(), recur, scope)) {
-        if (llvm::all_of(ifOp.thenBlock()->without_terminator(),
-                         [&](Operation &o) {
-                           return isValidSymbolInt(&o, recur, scope);
-                         }) &&
-            llvm::all_of(ifOp.elseBlock()->without_terminator(),
-                         [&](Operation &o) {
-                           return isValidSymbolInt(&o, recur, scope);
-                         }))
+        if (llvm::all_of(
+                ifOp.thenBlock()->getTerminator()->getOperands(),
+                [&](Value v) { return isValidSymbolInt(v, recur, scope); }) &&
+            llvm::all_of(
+                ifOp.elseBlock()->getTerminator()->getOperands(),
+                [&](Value v) { return isValidSymbolInt(v, recur, scope); }))
           return true;
       }
     }
@@ -115,14 +113,12 @@ bool isValidSymbolInt(Operation *defOp, bool recur, Region *scope) {
       if (llvm::all_of(ifOp.getOperands(), [&](Value o) {
             return isValidSymbolInt(o, recur, scope);
           }))
-        if (llvm::all_of(ifOp.getThenBlock()->without_terminator(),
-                         [&](Operation &o) {
-                           return isValidSymbolInt(&o, recur, scope);
-                         }) &&
-            llvm::all_of(ifOp.getElseBlock()->without_terminator(),
-                         [&](Operation &o) {
-                           return isValidSymbolInt(&o, recur, scope);
-                         }))
+        if (llvm::all_of(
+                ifOp.getThenBlock()->getTerminator()->getOperands(),
+                [&](Value v) { return isValidSymbolInt(v, recur, scope); }) &&
+            llvm::all_of(
+                ifOp.getElseBlock()->getTerminator()->getOperands(),
+                [&](Value v) { return isValidSymbolInt(v, recur, scope); }))
           return true;
     }
   }
@@ -345,7 +341,7 @@ AffineApplyNormalizer::AffineApplyNormalizer(AffineMap map,
       }
       for (auto &r : todo->getRegions()) {
         for (auto &b : r.getBlocks())
-          for (auto &o2 : b.without_terminator())
+          for (auto &o2 : b)
             getAllOps(&o2);
       }
     };
@@ -1358,7 +1354,7 @@ bool handle(PatternRewriter &b, AffineIfOp ifOp, size_t idx,
   auto tval =
       cast<AffineYieldOp>(ifOp.getThenBlock()->getTerminator()).getOperand(idx);
   auto fval =
-      cast<AffineYieldOp>(ifOp.getThenBlock()->getTerminator()).getOperand(idx);
+      cast<AffineYieldOp>(ifOp.getElseBlock()->getTerminator()).getOperand(idx);
   if (!negated && matchPattern(tval, m_One()) && matchPattern(fval, m_Zero())) {
     auto iset = ifOp.getCondition();
     for (auto expr : iset.getConstraints()) {
@@ -1649,52 +1645,65 @@ static void replaceLoad(memref::LoadOp load,
 }
 */
 
+template <typename Op>
+LogicalResult raiseAtomicRMW(Op rmw, PatternRewriter &rewriter) {
+  auto scope = getLocalAffineScope(rmw);
+  for (auto idx : rmw.getIndices()) {
+    if (!isValidIndex(idx, scope)) {
+      return failure();
+    }
+  }
+
+  auto memrefType = cast<MemRefType>(rmw.getMemref().getType());
+  int64_t rank = memrefType.getRank();
+
+  // Create identity map for memrefs with at least one dimension or () -> ()
+  // for zero-dimensional memrefs.
+  SmallVector<AffineExpr, 4> dimExprs;
+  dimExprs.reserve(rank);
+  for (unsigned i = 0; i < rank; ++i)
+    dimExprs.push_back(rewriter.getAffineSymbolExpr(i));
+  auto map = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/rank, dimExprs,
+                            rewriter.getContext());
+
+  SmallVector<Value, 4> operands = rmw.getIndices();
+
+  if (map.getNumInputs() != operands.size()) {
+    // load->getParentOfType<FuncOp>().dump();
+    llvm::errs() << " load: " << rmw << "\n";
+  }
+  auto *parentScope = scope->getParentOp();
+  DominanceInfo DI(parentScope);
+  assert(map.getNumInputs() == operands.size());
+  fully2ComposeAffineMapAndOperands(rewriter, &map, &operands, DI, scope);
+  assert(map.getNumInputs() == operands.size());
+  affine::canonicalizeMapAndOperands(&map, &operands);
+  map = recreateExpr(map);
+  assert(map.getNumInputs() == operands.size());
+  auto alignment = rmw->template getAttrOfType<IntegerAttr>(
+      memref::AllocOp::getAlignmentAttrStrName());
+  auto affineLoad = enzyme::AffineAtomicRMWOp::create(
+      rewriter, rmw.getLoc(), rmw.getValue().getType(), rmw.getKind(),
+      rmw.getValue(), rmw.getMemref(), operands, map, alignment);
+  rmw.getResult().replaceAllUsesWith(affineLoad.getResult());
+  rewriter.eraseOp(rmw);
+  return success();
+}
+
+struct MoveEnzymeRMWToAffine : public OpRewritePattern<enzyme::AtomicRMWOp> {
+  using OpRewritePattern<enzyme::AtomicRMWOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(enzyme::AtomicRMWOp rmw,
+                                PatternRewriter &rewriter) const override {
+    return raiseAtomicRMW(rmw, rewriter);
+  }
+};
+
 struct MoveRMWToAffine : public OpRewritePattern<memref::AtomicRMWOp> {
   using OpRewritePattern<memref::AtomicRMWOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::AtomicRMWOp rmw,
                                 PatternRewriter &rewriter) const override {
-    auto scope = getLocalAffineScope(rmw);
-    for (auto idx : rmw.getIndices()) {
-      if (!isValidIndex(idx, scope)) {
-        return failure();
-      }
-    }
-
-    auto memrefType = cast<MemRefType>(rmw.getMemref().getType());
-    int64_t rank = memrefType.getRank();
-
-    // Create identity map for memrefs with at least one dimension or () -> ()
-    // for zero-dimensional memrefs.
-    SmallVector<AffineExpr, 4> dimExprs;
-    dimExprs.reserve(rank);
-    for (unsigned i = 0; i < rank; ++i)
-      dimExprs.push_back(rewriter.getAffineSymbolExpr(i));
-    auto map = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/rank, dimExprs,
-                              rewriter.getContext());
-
-    SmallVector<Value, 4> operands = rmw.getIndices();
-
-    if (map.getNumInputs() != operands.size()) {
-      // load->getParentOfType<FuncOp>().dump();
-      llvm::errs() << " load: " << rmw << "\n";
-    }
-    auto *parentScope = scope->getParentOp();
-    DominanceInfo DI(parentScope);
-    assert(map.getNumInputs() == operands.size());
-    fully2ComposeAffineMapAndOperands(rewriter, &map, &operands, DI, scope);
-    assert(map.getNumInputs() == operands.size());
-    affine::canonicalizeMapAndOperands(&map, &operands);
-    map = recreateExpr(map);
-    assert(map.getNumInputs() == operands.size());
-    auto alignment = rmw->getAttrOfType<IntegerAttr>(
-        memref::AllocOp::getAlignmentAttrStrName());
-    auto affineLoad = enzyme::AffineAtomicRMWOp::create(
-        rewriter, rmw.getLoc(), rmw.getValue().getType(), rmw.getKind(),
-        rmw.getValue(), rmw.getMemref(), operands, map, alignment);
-    rmw.getResult().replaceAllUsesWith(affineLoad.getResult());
-    rewriter.eraseOp(rmw);
-    return success();
+    return raiseAtomicRMW(rmw, rewriter);
   }
 };
 
@@ -2438,7 +2447,7 @@ struct MoveSelectToAffine : public OpRewritePattern<arith::SelectOp> {
           auto idx = cast<OpResult>(opv.get()).getResultNumber();
           auto tval = cast<AffineYieldOp>(midIf.getThenBlock()->getTerminator())
                           .getOperand(idx);
-          auto fval = cast<AffineYieldOp>(midIf.getThenBlock()->getTerminator())
+          auto fval = cast<AffineYieldOp>(midIf.getElseBlock()->getTerminator())
                           .getOperand(idx);
           if (matchPattern(tval, m_One()) && matchPattern(fval, m_Zero()))
             continue;
@@ -6215,8 +6224,9 @@ void mlir::enzyme::populateAffineCFGPatterns(RewritePatternSet &rpl) {
           CanonicalizeIndexCast<IndexCastUIOp>, AffineIfYieldMovementPattern,
           /* IndexCastMovement,*/ AffineFixup<affine::AffineLoadOp>,
           AffineFixup<affine::AffineStoreOp>, CanonicalizIfBounds,
-          MoveStoreToAffine, MoveIfToAffine, MoveRMWToAffine, MoveLoadToAffine,
-          MoveExtToAffine, MoveSIToFPToAffine, CmpExt, MoveSelectToAffine,
+          MoveStoreToAffine, MoveIfToAffine, MoveEnzymeRMWToAffine,
+          MoveRMWToAffine, MoveLoadToAffine, MoveExtToAffine,
+          MoveSIToFPToAffine, CmpExt, MoveSelectToAffine,
           AffineIfSimplification, AffineIfSimplificationIsl, CombineAffineIfs,
           MergeNestedAffineParallelLoops, PrepMergeNestedAffineParallelLoops,
           MergeNestedAffineParallelIf, MergeParallelInductions, OptimizeRem,
